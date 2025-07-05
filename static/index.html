@@ -2,21 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Upload PDF → Markdown</title>
+    <title>Document to Markdown Converter</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
     <div class="max-w-xl w-full bg-white p-6 rounded-lg shadow border border-gray-200">
-      <h1 class="text-2xl font-bold mb-4 text-center">Convert PDF to Markdown</h1>
+      <h1 class="text-2xl font-bold mb-4 text-center">Convert Documents to Markdown</h1>
 
       <div class="space-y-4">
         <!-- Upload area -->
         <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <p class="text-sm text-gray-600 mb-4">Choose a PDF file to upload</p>
+          <p class="text-sm text-gray-600 mb-4">Choose a PDF or PowerPoint file to upload</p>
           <input
             type="file"
             id="fileInput"
-            accept=".pdf"
+            accept=".pdf,.pptx,.ppt"
             class="block w-full text-sm text-gray-800"
           />
           <button
@@ -53,8 +53,22 @@
 
       uploadBtn.addEventListener("click", async () => {
         const file = fileInput.files[0];
-        if (!file || file.type !== "application/pdf") {
-          showMessage("Please select a valid PDF file.", "error");
+        if (!file) {
+          showMessage("Please select a file.", "error");
+          return;
+        }
+
+        // Check file type
+        const validTypes = [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "application/vnd.ms-powerpoint"
+        ];
+        const validExtensions = [".pdf", ".pptx", ".ppt"];
+        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        
+        if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
+          showMessage("Please select a valid PDF or PowerPoint file (.pdf, .pptx, .ppt).", "error");
           return;
         }
 
@@ -86,7 +100,7 @@
 
           markdownOutput.value = result.markdown;
           previewBox.classList.remove("hidden");
-          showMessage("Conversion successful!", "success");
+          showMessage(`Conversion successful! Processed ${result.pages_processed} page(s).`, "success");
         } catch (err) {
           console.error("Upload error:", err);
           showMessage("Error: " + err.message, "error");
