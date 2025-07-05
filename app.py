@@ -23,71 +23,73 @@ logger.info("=" * 50)
 # Try to import required libraries with error handling
 logger.info("Importing required libraries...")
 
+# Global variables for optional dependencies
+openai = None
+fitz = None
+Presentation = None
+Image = None
+pd = None
+openpyxl = None
+Document = None
+markdownify = None
+
 try:
     import openai
     logger.info("✅ OpenAI imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import openai: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import openai: {e}")
+    logger.warning("OpenAI functionality will be disabled")
 
 try:
     import fitz  # PyMuPDF for PDFs
     logger.info("✅ PyMuPDF imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import PyMuPDF: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import PyMuPDF: {e}")
+    logger.warning("PDF functionality will be disabled")
 
 try:
     from pptx import Presentation
     logger.info("✅ python-pptx imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import python-pptx: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import python-pptx: {e}")
+    logger.warning("PowerPoint functionality will be disabled")
 
 try:
     from PIL import Image
     logger.info("✅ Pillow imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import Pillow: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import Pillow: {e}")
+    logger.warning("Image processing functionality will be disabled")
 
 try:
     import pandas as pd
     logger.info("✅ pandas imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import pandas: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import pandas: {e}")
+    logger.warning("CSV/Excel functionality will be disabled")
 
 try:
     import openpyxl
     logger.info("✅ openpyxl imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import openpyxl: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import openpyxl: {e}")
+    logger.warning("Excel functionality will be disabled")
 
 try:
     from docx import Document
     logger.info("✅ python-docx imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import python-docx: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import python-docx: {e}")
+    logger.warning("Word document functionality will be disabled")
 
 try:
     from markdownify import markdownify
     logger.info("✅ markdownify imported successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import markdownify: {e}")
-    logger.error(f"Traceback: {traceback.format_exc()}")
-    raise
+    logger.warning(f"⚠️ Failed to import markdownify: {e}")
+    logger.warning("HTML to markdown conversion will be disabled")
 
-logger.info("All libraries imported successfully!")
+logger.info("Library import check completed!")
 
 app = FastAPI(title="Document to Markdown Converter")
 
@@ -165,8 +167,11 @@ def index():
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(500, "Internal server error")
 
-def image_to_base64(image: Image.Image) -> str:
+def image_to_base64(image) -> str:
     """Convert PIL Image to base64 string"""
+    if Image is None:
+        raise ImportError("Pillow (PIL) is not available")
+    
     try:
         buffered = io.BytesIO()
         image.save(buffered, format="PNG")
@@ -179,6 +184,11 @@ def image_to_base64(image: Image.Image) -> str:
 
 def pdf_to_images(pdf_data: bytes):
     """Convert PDF bytes to list of PIL Images"""
+    if fitz is None:
+        raise ImportError("PyMuPDF (fitz) is not available")
+    if Image is None:
+        raise ImportError("Pillow (PIL) is not available")
+    
     try:
         logger.info(f"Opening PDF with {len(pdf_data)} bytes...")
         doc = fitz.open(stream=pdf_data, filetype="pdf")
@@ -203,6 +213,9 @@ def pdf_to_images(pdf_data: bytes):
 
 def pptx_slide_texts(pptx_data: bytes):
     """Extract text from PowerPoint bytes"""
+    if Presentation is None:
+        raise ImportError("python-pptx is not available")
+    
     temp_file_path = None
     try:
         logger.info("Creating temporary PPTX file...")
@@ -239,6 +252,9 @@ def pptx_slide_texts(pptx_data: bytes):
 
 def docx_to_markdown(docx_data: bytes) -> str:
     """Convert DOCX data to markdown"""
+    if Document is None:
+        raise ImportError("python-docx is not available")
+    
     temp_file_path = None
     try:
         logger.info("Converting DOCX to markdown...")
@@ -363,6 +379,11 @@ def csv_to_markdown(csv_data: bytes) -> str:
 
 def excel_to_markdown(excel_data: bytes) -> str:
     """Convert Excel data to markdown table"""
+    if pd is None:
+        raise ImportError("pandas is not available")
+    if openpyxl is None:
+        raise ImportError("openpyxl is not available")
+    
     temp_file_path = None
     try:
         logger.info("Converting Excel to markdown...")
@@ -415,6 +436,9 @@ def excel_to_markdown(excel_data: bytes) -> str:
 
 def call_openai_with_text(text: str) -> str:
     """Call OpenAI API with text content"""
+    if openai_client is None:
+        raise ImportError("OpenAI client is not available")
+    
     try:
         logger.info(f"Calling OpenAI with text ({len(text)} characters)...")
         response = openai_client.chat.completions.create(
@@ -435,6 +459,9 @@ def call_openai_with_text(text: str) -> str:
 
 def call_openai_with_image(base64_image: str) -> str:
     """Call OpenAI API with image content"""
+    if openai_client is None:
+        raise ImportError("OpenAI client is not available")
+    
     try:
         logger.info(f"Calling OpenAI with image ({len(base64_image)} base64 characters)...")
         response = openai_client.chat.completions.create(
