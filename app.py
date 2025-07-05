@@ -171,23 +171,61 @@ async def upload(file: UploadFile = File(...)):
         logger.info(f"Apify result structure: {list(results[0].keys())}")
         logger.info(f"First result: {results[0]}")
         
-        # Extract markdown from the first result - try different possible field names
+        # Extract the output file URL from the first result
         result = results[0]
-        md = None
+        if "output_file" not in result:
+            logger.error(f"No output_file field found in Apify result. Available fields: {list(result.keys())}")
+            raise HTTPException(500, f"No output file found in Apify results. Available fields: {list(result.keys())}")
         
-        # Try different possible field names for markdown content
-        possible_markdown_fields = ["markdown", "md", "content", "text", "markdown_content"]
-        for field in possible_markdown_fields:
-            if field in result:
-                md = result[field]
-                logger.info(f"Found markdown in field: {field}")
-                break
+        output_file_url = result["output_file"]
+        logger.info(f"Output file URL: {output_file_url}")
         
-        if md is None:
-            # If no markdown field found, log the entire result and raise error
-            logger.error(f"No markdown field found in Apify result. Available fields: {list(result.keys())}")
-            logger.error(f"Full result: {result}")
-            raise HTTPException(500, f"Markdown not found in Apify results. Available fields: {list(result.keys())}")
+        # Download the ZIP file from Apify
+        logger.info("Downloading ZIP file from Apify...")
+        response = requests.get(output_file_url)
+        if response.status_code != 200:
+            logger.error(f"Failed to download ZIP file. Status: {response.status_code}")
+            raise HTTPException(500, f"Failed to download output file from Apify. Status: {response.status_code}")
+        
+        # Save ZIP to temporary file and extract
+        import zipfile
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_zip:
+            temp_zip.write(response.content)
+            temp_zip_path = temp_zip.name
+        
+        try:
+            # Extract the ZIP file
+            logger.info("Extracting ZIP file...")
+            with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+                # List contents for debugging
+                file_list = zip_ref.namelist()
+                logger.info(f"ZIP contents: {file_list}")
+                
+                # Look for markdown file
+                markdown_file = None
+                for file_name in file_list:
+                    if file_name.endswith('.md') or file_name.endswith('.markdown'):
+                        markdown_file = file_name
+                        break
+                
+                if not markdown_file:
+                    logger.error(f"No markdown file found in ZIP. Contents: {file_list}")
+                    raise HTTPException(500, f"No markdown file found in output. ZIP contents: {file_list}")
+                
+                # Read the markdown content
+                with zip_ref.open(markdown_file) as md_file:
+                    md = md_file.read().decode('utf-8')
+                    logger.info(f"Found markdown file: {markdown_file}")
+        
+        finally:
+            # Clean up temporary ZIP file
+            try:
+                os.unlink(temp_zip_path)
+                logger.info("Temporary ZIP file cleaned up")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary ZIP file: {e}")
         
         logger.info(f"Conversion successful, markdown length: {len(md)} characters")
         
