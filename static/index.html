@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Landing Page Creator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white text-black flex items-center justify-center min-h-screen px-4">
+  <div class="w-full max-w-md">
+    <h1 class="text-2xl font-medium mb-6 text-center">
+      What landing page you'd like to create today?
+    </h1>
+    
+    <div class="relative">
+      <input
+        type="text"
+        placeholder="Type your idea..."
+        class="w-full border border-black px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-0"
+      />
+
+      <!-- Upload "+" button -->
+      <button
+        id="uploadBtn"
+        class="absolute bottom-1 left-1 w-6 h-6 flex items-center justify-center border border-black text-black text-lg leading-none"
+      >
+        +
+      </button>
+    </div>
+
+    <!-- Drag and drop area (hidden by default) -->
+    <div
+      id="dropArea"
+      class="mt-4 border-2 border-dashed border-gray-400 bg-gray-100 text-gray-600 text-sm p-6 text-center hidden"
+    >
+      Drag & drop your files here
+    </div>
+  </div>
+
+  <script>
+    const uploadBtn = document.getElementById('uploadBtn');
+    const dropArea = document.getElementById('dropArea');
+
+    uploadBtn.addEventListener('click', () => {
+      dropArea.classList.toggle('hidden');
+    });
+  </script>
+</body>
+</html>
