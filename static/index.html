@@ -1,49 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Landing Page Creator</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-white text-black flex items-center justify-center min-h-screen px-4">
-  <div class="w-full max-w-md">
-    <h1 class="text-2xl font-medium mb-6 text-center">
-      What landing page you'd like to create today?
-    </h1>
-    
-    <div class="relative">
-      <input
-        type="text"
-        placeholder="Type your idea..."
-        class="w-full border border-black px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-0"
-      />
+  <head>
+    <meta charset="UTF-8" />
+    <title>Upload PDF → Markdown</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-50 flex items-center justify-center min-h-screen p-4">
+    <div class="max-w-xl w-full bg-white p-6 rounded-lg shadow border border-gray-200">
+      <h1 class="text-2xl font-bold mb-4 text-center">Convert PDF to Markdown</h1>
 
-      <!-- Upload "+" button -->
-      <button
-        id="uploadBtn"
-        class="absolute bottom-1 left-1 w-6 h-6 flex items-center justify-center border border-black text-black text-lg leading-none"
-      >
-        +
-      </button>
+      <div class="space-y-4">
+        <!-- Upload area -->
+        <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <p class="text-sm text-gray-600 mb-4">Choose a PDF file to upload</p>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".pdf"
+            class="block w-full text-sm text-gray-800"
+          />
+          <button
+            id="uploadBtn"
+            class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Upload and Convert
+          </button>
+        </div>
+
+        <!-- Status message -->
+        <div id="messageBox" class="hidden p-3 text-sm rounded"></div>
+
+        <!-- Markdown preview -->
+        <div id="previewBox" class="hidden border border-gray-200 rounded-lg">
+          <div class="bg-gray-100 px-4 py-2 border-b border-gray-200">
+            <p class="text-sm text-gray-600">Markdown Output</p>
+          </div>
+          <textarea
+            id="markdownOutput"
+            class="w-full h-80 p-4 font-mono text-sm text-gray-900 bg-white border-0 resize-none focus:outline-none"
+            readonly
+          ></textarea>
+        </div>
+      </div>
     </div>
 
-    <!-- Drag and drop area (hidden by default) -->
-    <div
-      id="dropArea"
-      class="mt-4 border-2 border-dashed border-gray-400 bg-gray-100 text-gray-600 text-sm p-6 text-center hidden"
-    >
-      Drag & drop your files here
-    </div>
-  </div>
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const uploadBtn = document.getElementById("uploadBtn");
+      const messageBox = document.getElementById("messageBox");
+      const previewBox = document.getElementById("previewBox");
+      const markdownOutput = document.getElementById("markdownOutput");
 
-  <script>
-    const uploadBtn = document.getElementById('uploadBtn');
-    const dropArea = document.getElementById('dropArea');
+      uploadBtn.addEventListener("click", async () => {
+        const file = fileInput.files[0];
+        if (!file || file.type !== "application/pdf") {
+          showMessage("Please select a valid PDF file.", "error");
+          return;
+        }
 
-    uploadBtn.addEventListener('click', () => {
-      dropArea.classList.toggle('hidden');
-    });
-  </script>
-</body>
+        const formData = new FormData();
+        formData.append("file", file);
+
+        showMessage("Uploading and converting...", "loading");
+
+        try {
+          const response = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.detail || "Upload failed");
+          }
+
+          markdownOutput.value = result.markdown;
+          previewBox.classList.remove("hidden");
+          showMessage("Conversion successful!", "success");
+        } catch (err) {
+          showMessage("Error: " + err.message, "error");
+        }
+      });
+
+      function showMessage(text, type) {
+        messageBox.textContent = text;
+        messageBox.classList.remove("hidden");
+        messageBox.className = "text-sm p-3 rounded";
+
+        if (type === "success") {
+          messageBox.classList.add("bg-green-50", "text-green-800", "border", "border-green-200");
+        } else if (type === "error") {
+          messageBox.classList.add("bg-red-50", "text-red-800", "border", "border-red-200");
+        } else {
+          messageBox.classList.add("bg-blue-50", "text-blue-800", "border", "border-blue-200");
+        }
+      }
+    </script>
+  </body>
 </html>
+
