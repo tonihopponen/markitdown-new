@@ -1,81 +1,61 @@
 #!/usr/bin/env python3
 """
-Test script to verify all imports and basic functionality
+Test script to verify all required dependencies can be imported.
+Run this to check if your environment is properly set up.
 """
+
 import sys
-import os
-import time
+import traceback
 
-print("Testing imports...")
+def test_import(module_name, package_name=None):
+    """Test if a module can be imported"""
+    try:
+        if package_name:
+            module = __import__(package_name)
+        else:
+            module = __import__(module_name)
+        print(f"✅ {module_name} imported successfully")
+        return True
+    except ImportError as e:
+        print(f"❌ Failed to import {module_name}: {e}")
+        print(f"   Traceback: {traceback.format_exc()}")
+        return False
+    except Exception as e:
+        print(f"❌ Error importing {module_name}: {e}")
+        print(f"   Traceback: {traceback.format_exc()}")
+        return False
 
-try:
-    import fastapi
-    print("✅ FastAPI imported successfully")
-except ImportError as e:
-    print(f"❌ FastAPI import failed: {e}")
-    sys.exit(1)
+def main():
+    print("=" * 50)
+    print("Testing all required dependencies...")
+    print("=" * 50)
+    
+    # Core FastAPI dependencies
+    print("\n--- Core Dependencies ---")
+    test_import("fastapi")
+    test_import("uvicorn")
+    test_import("multipart", "python-multipart")
+    
+    # OpenAI
+    print("\n--- AI/ML Dependencies ---")
+    test_import("openai")
+    
+    # Document processing
+    print("\n--- Document Processing ---")
+    test_import("fitz", "PyMuPDF")  # PDF processing
+    test_import("pptx", "python-pptx")  # PowerPoint processing
+    test_import("docx", "python-docx")  # Word document processing
+    test_import("PIL", "Pillow")  # Image processing
+    
+    # Data processing
+    print("\n--- Data Processing ---")
+    test_import("pandas")
+    test_import("openpyxl")
+    test_import("markdownify")
+    
+    print("\n" + "=" * 50)
+    print("Import testing complete!")
+    print("=" * 50)
 
-try:
-    import openai
-    print("✅ OpenAI imported successfully")
-except ImportError as e:
-    print(f"❌ OpenAI import failed: {e}")
-    sys.exit(1)
-
-print("Loading PyMuPDF...")
-start_time = time.time()
-try:
-    import fitz
-    load_time = time.time() - start_time
-    print(f"✅ PyMuPDF imported successfully (took {load_time:.2f}s)")
-except ImportError as e:
-    print(f"❌ PyMuPDF import failed: {e}")
-    sys.exit(1)
-
-try:
-    from pptx import Presentation
-    print("✅ python-pptx imported successfully")
-except ImportError as e:
-    print(f"❌ python-pptx import failed: {e}")
-    sys.exit(1)
-
-try:
-    from PIL import Image
-    print("✅ Pillow imported successfully")
-except ImportError as e:
-    print(f"❌ Pillow import failed: {e}")
-    sys.exit(1)
-
-try:
-    import pandas as pd
-    print("✅ pandas imported successfully")
-except ImportError as e:
-    print(f"❌ pandas import failed: {e}")
-    sys.exit(1)
-
-try:
-    import openpyxl
-    print("✅ openpyxl imported successfully")
-except ImportError as e:
-    print(f"❌ openpyxl import failed: {e}")
-    sys.exit(1)
-
-try:
-    import uvicorn
-    print("✅ uvicorn imported successfully")
-except ImportError as e:
-    print(f"❌ uvicorn import failed: {e}")
-    sys.exit(1)
-
-print("\n✅ All imports successful!")
-print("\nEnvironment variables check:")
-env_vars = [
-    "OPENAI_API_KEY"
-]
-
-for var in env_vars:
-    value = os.getenv(var)
-    status = "✅ SET" if value else "❌ NOT SET"
-    print(f"  {var}: {status}")
-
-print("\nReady to run!") 
+if __name__ == "__main__":
+    main() 

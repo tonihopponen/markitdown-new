@@ -71,6 +71,22 @@ except ImportError as e:
     logger.error(f"Traceback: {traceback.format_exc()}")
     raise
 
+try:
+    from docx import Document
+    logger.info("✅ python-docx imported successfully")
+except ImportError as e:
+    logger.error(f"❌ Failed to import python-docx: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    raise
+
+try:
+    from markdownify import markdownify
+    logger.info("✅ markdownify imported successfully")
+except ImportError as e:
+    logger.error(f"❌ Failed to import markdownify: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    raise
+
 logger.info("All libraries imported successfully!")
 
 app = FastAPI(title="Document to Markdown Converter")
@@ -220,6 +236,80 @@ def pptx_slide_texts(pptx_data: bytes):
                 logger.info("✅ Temporary PPTX file cleaned up")
             except Exception as e:
                 logger.warning(f"⚠️ Failed to clean up temporary PPTX file: {e}")
+
+def docx_to_markdown(docx_data: bytes) -> str:
+    """Convert DOCX data to markdown"""
+    temp_file_path = None
+    try:
+        logger.info("Converting DOCX to markdown...")
+        
+        # Save DOCX data to temporary file
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as temp_file:
+            temp_file.write(docx_data)
+            temp_file_path = temp_file.name
+        
+        # Open DOCX document
+        doc = Document(temp_file_path)
+        
+        # Extract text and formatting
+        paragraphs = []
+        for para in doc.paragraphs:
+            if para.text.strip():  # Only add non-empty paragraphs
+                # Check for heading styles
+                if para.style.name.startswith('Heading'):
+                    level = para.style.name[-1] if para.style.name[-1].isdigit() else '1'
+                    paragraphs.append(f"{'#' * int(level)} {para.text}")
+                else:
+                    paragraphs.append(para.text)
+        
+        # Extract table data
+        tables = []
+        for table in doc.tables:
+            table_data = []
+            for row in table.rows:
+                row_data = [cell.text for cell in row.cells]
+                table_data.append(row_data)
+            
+            if table_data:
+                # Convert table to markdown
+                if len(table_data) > 0:
+                    headers = table_data[0]
+                    body = table_data[1:]
+                    
+                    # Create markdown table
+                    table_lines = []
+                    table_lines.append('| ' + ' | '.join(headers) + ' |')
+                    table_lines.append('|' + '|'.join(['---'] * len(headers)) + '|')
+                    
+                    for row in body:
+                        # Pad row if shorter than headers
+                        while len(row) < len(headers):
+                            row.append('')
+                        # Truncate if longer
+                        row = row[:len(headers)]
+                        table_lines.append('| ' + ' | '.join(row) + ' |')
+                    
+                    tables.append('\n'.join(table_lines))
+        
+        # Combine paragraphs and tables
+        content = '\n\n'.join(paragraphs)
+        if tables:
+            content += '\n\n' + '\n\n'.join(tables)
+        
+        logger.info(f"✅ DOCX converted to markdown ({len(content)} characters)")
+        return content
+        
+    except Exception as e:
+        logger.error(f"❌ Error converting DOCX to markdown: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
+    finally:
+        if temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+                logger.info("✅ Temporary DOCX file cleaned up")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to clean up temporary DOCX file: {e}")
 
 def csv_to_markdown(csv_data: bytes) -> str:
     """Convert CSV data to markdown table"""
@@ -402,6 +492,13 @@ async def upload(file: UploadFile = File(...)):
             md = call_openai_with_text(combined_text)
             pages_processed = len(slides_text)
             
+        elif content_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                             "application/msword"] or file_extension in ["docx", "doc"]:
+            # Process Word document
+            logger.info("Processing Word document...")
+            md = docx_to_markdown(data)
+            pages_processed = 1
+            
         elif content_type == "text/csv" or file_extension == "csv":
             # Process CSV
             logger.info("Processing CSV file...")
@@ -424,7 +521,7 @@ async def upload(file: UploadFile = File(...)):
                 pages_processed = 1
             except UnicodeDecodeError:
                 logger.error(f"❌ Unsupported file type: {content_type}")
-                raise HTTPException(400, "Unsupported file type. Please upload PDF, PowerPoint, CSV, Excel, or text files.")
+                raise HTTPException(400, "Unsupported file type. Please upload PDF, PowerPoint, Word, CSV, Excel, or text files.")
         
         logger.info(f"✅ Conversion successful, markdown length: {len(md)} characters")
         

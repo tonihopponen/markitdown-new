@@ -13,11 +13,11 @@
         <!-- Upload area -->
         <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
           <p class="text-sm text-gray-600 mb-4">Choose a document file to upload</p>
-          <p class="text-xs text-gray-500 mb-4">Supported: PDF, PowerPoint, CSV, Excel</p>
+          <p class="text-xs text-gray-500 mb-4">Supported: PDF, PowerPoint, Word, CSV, Excel</p>
           <input
             type="file"
             id="fileInput"
-            accept=".pdf,.pptx,.ppt,.csv,.xlsx,.xls"
+            accept=".pdf,.pptx,.ppt,.docx,.doc,.csv,.xlsx,.xls"
             class="block w-full text-sm text-gray-800"
           />
           <button
@@ -64,15 +64,17 @@
           "application/pdf",
           "application/vnd.openxmlformats-officedocument.presentationml.presentation",
           "application/vnd.ms-powerpoint",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/msword",
           "text/csv",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "application/vnd.ms-excel"
         ];
-        const validExtensions = [".pdf", ".pptx", ".ppt", ".csv", ".xlsx", ".xls"];
+        const validExtensions = [".pdf", ".pptx", ".ppt", ".docx", ".doc", ".csv", ".xlsx", ".xls"];
         const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
         
         if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
-          showMessage("Please select a valid document file (.pdf, .pptx, .ppt, .csv, .xlsx, .xls).", "error");
+          showMessage("Please select a valid document file (.pdf, .pptx, .ppt, .docx, .doc, .csv, .xlsx, .xls).", "error");
           return;
         }
 
