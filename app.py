@@ -167,12 +167,28 @@ async def upload(file: UploadFile = File(...)):
         if not results:
             raise HTTPException(500, "No results returned from Apify Docling")
         
-        # Extract markdown from the first result
-        result = results[0]
-        if "markdown" not in result:
-            raise HTTPException(500, "Markdown not found in Apify results")
+        # Log the structure of the first result for debugging
+        logger.info(f"Apify result structure: {list(results[0].keys())}")
+        logger.info(f"First result: {results[0]}")
         
-        md = result["markdown"]
+        # Extract markdown from the first result - try different possible field names
+        result = results[0]
+        md = None
+        
+        # Try different possible field names for markdown content
+        possible_markdown_fields = ["markdown", "md", "content", "text", "markdown_content"]
+        for field in possible_markdown_fields:
+            if field in result:
+                md = result[field]
+                logger.info(f"Found markdown in field: {field}")
+                break
+        
+        if md is None:
+            # If no markdown field found, log the entire result and raise error
+            logger.error(f"No markdown field found in Apify result. Available fields: {list(result.keys())}")
+            logger.error(f"Full result: {result}")
+            raise HTTPException(500, f"Markdown not found in Apify results. Available fields: {list(result.keys())}")
+        
         logger.info(f"Conversion successful, markdown length: {len(md)} characters")
         
         return JSONResponse({"file_url": public_url, "markdown": md})
