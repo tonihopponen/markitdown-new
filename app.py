@@ -377,8 +377,26 @@ def excel_to_markdown(excel_data: bytes) -> str:
         
         logger.info(f"✅ Excel parsed: {len(df.columns)} columns, {len(df)} rows")
         
-        # Convert to markdown
-        markdown_table = df.to_markdown(index=False)
+        # Convert to markdown - handle missing tabulate dependency
+        try:
+            markdown_table = df.to_markdown(index=False)
+        except ImportError:
+            # Fallback: create markdown table manually
+            logger.info("tabulate not available, creating markdown table manually")
+            headers = df.columns.tolist()
+            rows = df.values.tolist()
+            
+            # Create markdown table
+            table_lines = []
+            table_lines.append('| ' + ' | '.join(str(col) for col in headers) + ' |')
+            table_lines.append('|' + '|'.join(['---'] * len(headers)) + '|')
+            
+            for row in rows:
+                # Convert all values to strings and escape pipes
+                row_str = [str(cell).replace('|', '\\|') for cell in row]
+                table_lines.append('| ' + ' | '.join(row_str) + ' |')
+            
+            markdown_table = '\n'.join(table_lines)
         
         logger.info(f"✅ Excel converted to markdown ({len(markdown_table)} characters)")
         return markdown_table

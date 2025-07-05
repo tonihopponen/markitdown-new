@@ -52,6 +52,7 @@ def main():
     test_import("pandas")
     test_import("openpyxl")
     test_import("markdownify")
+    test_import("tabulate")
     
     print("\n" + "=" * 50)
     print("Import testing complete!")
