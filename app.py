@@ -3,6 +3,7 @@ import logging
 import tempfile
 import base64
 import traceback
+import csv
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,6 +52,22 @@ try:
     logger.info("✅ Pillow imported successfully")
 except ImportError as e:
     logger.error(f"❌ Failed to import Pillow: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    raise
+
+try:
+    import pandas as pd
+    logger.info("✅ pandas imported successfully")
+except ImportError as e:
+    logger.error(f"❌ Failed to import pandas: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
+    raise
+
+try:
+    import openpyxl
+    logger.info("✅ openpyxl imported successfully")
+except ImportError as e:
+    logger.error(f"❌ Failed to import openpyxl: {e}")
     logger.error(f"Traceback: {traceback.format_exc()}")
     raise
 
@@ -204,6 +221,90 @@ def pptx_slide_texts(pptx_data: bytes):
             except Exception as e:
                 logger.warning(f"⚠️ Failed to clean up temporary PPTX file: {e}")
 
+def csv_to_markdown(csv_data: bytes) -> str:
+    """Convert CSV data to markdown table"""
+    try:
+        logger.info("Converting CSV to markdown...")
+        
+        # Decode CSV data
+        csv_text = csv_data.decode('utf-8')
+        
+        # Parse CSV
+        lines = csv_text.strip().split('\n')
+        if not lines:
+            raise ValueError("Empty CSV file")
+        
+        # Parse CSV properly using csv module
+        csv_reader = csv.reader(lines)
+        rows = list(csv_reader)
+        
+        if not rows:
+            raise ValueError("No data in CSV file")
+        
+        header = rows[0]
+        body = rows[1:]
+        
+        logger.info(f"✅ CSV parsed: {len(header)} columns, {len(body)} rows")
+        
+        # Create markdown table
+        def make_row(cols):
+            return '| ' + ' | '.join(str(col).strip() for col in cols) + ' |'
+        
+        md_lines = []
+        md_lines.append(make_row(header))
+        md_lines.append('|' + '|'.join(['---'] * len(header)) + '|')
+        
+        for row in body:
+            # Pad row if it's shorter than header
+            while len(row) < len(header):
+                row.append('')
+            # Truncate row if it's longer than header
+            row = row[:len(header)]
+            md_lines.append(make_row(row))
+        
+        result = '\n'.join(md_lines)
+        logger.info(f"✅ CSV converted to markdown ({len(result)} characters)")
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Error converting CSV to markdown: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
+
+def excel_to_markdown(excel_data: bytes) -> str:
+    """Convert Excel data to markdown table"""
+    temp_file_path = None
+    try:
+        logger.info("Converting Excel to markdown...")
+        
+        # Save Excel data to temporary file
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
+            temp_file.write(excel_data)
+            temp_file_path = temp_file.name
+        
+        # Read Excel file with pandas
+        df = pd.read_excel(temp_file_path, engine='openpyxl')
+        
+        logger.info(f"✅ Excel parsed: {len(df.columns)} columns, {len(df)} rows")
+        
+        # Convert to markdown
+        markdown_table = df.to_markdown(index=False)
+        
+        logger.info(f"✅ Excel converted to markdown ({len(markdown_table)} characters)")
+        return markdown_table
+        
+    except Exception as e:
+        logger.error(f"❌ Error converting Excel to markdown: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
+    finally:
+        if temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+                logger.info("✅ Temporary Excel file cleaned up")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to clean up temporary Excel file: {e}")
+
 def call_openai_with_text(text: str) -> str:
     """Call OpenAI API with text content"""
     try:
@@ -287,6 +388,7 @@ async def upload(file: UploadFile = File(...)):
                 markdown_parts.append(f"## Page {i+1}\n\n{page_markdown}")
             
             md = "\n\n---\n\n".join(markdown_parts)
+            pages_processed = len(images)
             
         elif content_type in ["application/vnd.openxmlformats-officedocument.presentationml.presentation", 
                              "application/vnd.ms-powerpoint"] or file_extension in ["pptx", "ppt"]:
@@ -298,6 +400,20 @@ async def upload(file: UploadFile = File(...)):
             # Combine all slide text and convert to markdown
             combined_text = "\n\n---\n\n".join([f"Slide {i+1}:\n{text}" for i, text in enumerate(slides_text)])
             md = call_openai_with_text(combined_text)
+            pages_processed = len(slides_text)
+            
+        elif content_type == "text/csv" or file_extension == "csv":
+            # Process CSV
+            logger.info("Processing CSV file...")
+            md = csv_to_markdown(data)
+            pages_processed = 1
+            
+        elif content_type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             "application/vnd.ms-excel"] or file_extension in ["xlsx", "xls"]:
+            # Process Excel
+            logger.info("Processing Excel file...")
+            md = excel_to_markdown(data)
+            pages_processed = 1
             
         else:
             # For other file types, try to extract text and convert
@@ -305,9 +421,10 @@ async def upload(file: UploadFile = File(...)):
             try:
                 text_content = data.decode('utf-8')
                 md = call_openai_with_text(text_content)
+                pages_processed = 1
             except UnicodeDecodeError:
                 logger.error(f"❌ Unsupported file type: {content_type}")
-                raise HTTPException(400, "Unsupported file type. Please upload PDF, PowerPoint, or text files.")
+                raise HTTPException(400, "Unsupported file type. Please upload PDF, PowerPoint, CSV, Excel, or text files.")
         
         logger.info(f"✅ Conversion successful, markdown length: {len(md)} characters")
         
@@ -318,7 +435,7 @@ async def upload(file: UploadFile = File(...)):
             "file_id": file_id,
             "filename": file.filename,
             "markdown": md,
-            "pages_processed": len(images) if 'images' in locals() else 1
+            "pages_processed": pages_processed
         }
         
         logger.info("✅ Returning successful response")

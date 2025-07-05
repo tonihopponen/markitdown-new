@@ -47,6 +47,20 @@ except ImportError as e:
     sys.exit(1)
 
 try:
+    import pandas as pd
+    print("✅ pandas imported successfully")
+except ImportError as e:
+    print(f"❌ pandas import failed: {e}")
+    sys.exit(1)
+
+try:
+    import openpyxl
+    print("✅ openpyxl imported successfully")
+except ImportError as e:
+    print(f"❌ openpyxl import failed: {e}")
+    sys.exit(1)
+
+try:
     import uvicorn
     print("✅ uvicorn imported successfully")
 except ImportError as e:
