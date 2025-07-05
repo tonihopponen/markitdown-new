@@ -1,5 +1,6 @@
 import os, uuid, io
 import logging
+import tempfile
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -133,17 +134,32 @@ async def upload(file: UploadFile = File(...)):
         pdf_data = response['Body'].read()
         logger.info(f"Retrieved {len(pdf_data)} bytes from R2")
         
-        # Convert PDF to markdown using the raw data instead of URL
-        logger.info("Starting PDF to markdown conversion using raw data")
-        converter = DocumentConverter()
-        md = converter.convert(io.BytesIO(pdf_data)).document.export_to_markdown()
-        logger.info(f"Conversion successful, markdown length: {len(md)} characters")
+        # Save to temporary file for Docling (it expects a file path)
+        logger.info("Creating temporary file for Docling processing...")
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
+            temp_file.write(pdf_data)
+            temp_file_path = temp_file.name
         
-        # Construct public URL for response
-        public_url = f"https://{R2_BUCKET}.{R2_ACCOUNT_ID}.r2.dev/{key}"
-        logger.info(f"Public URL: {public_url}")
-        
-        return JSONResponse({"file_url": public_url, "markdown": md})
+        try:
+            # Convert PDF to markdown using the temporary file path
+            logger.info("Starting PDF to markdown conversion using temporary file")
+            converter = DocumentConverter()
+            md = converter.convert(temp_file_path).document.export_to_markdown()
+            logger.info(f"Conversion successful, markdown length: {len(md)} characters")
+            
+            # Construct public URL for response
+            public_url = f"https://{R2_BUCKET}.{R2_ACCOUNT_ID}.r2.dev/{key}"
+            logger.info(f"Public URL: {public_url}")
+            
+            return JSONResponse({"file_url": public_url, "markdown": md})
+            
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_file_path)
+                logger.info("Temporary file cleaned up")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary file: {e}")
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is
