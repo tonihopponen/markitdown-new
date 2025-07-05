@@ -122,20 +122,26 @@ async def upload(file: UploadFile = File(...)):
         data = await file.read()
         logger.info(f"File size: {len(data)} bytes")
         
-        # Upload to R2
+        # Upload to R2 using the bucket name in the upload call
         logger.info(f"Uploading to R2 bucket: {R2_BUCKET}")
         s3_client.upload_fileobj(io.BytesIO(data), R2_BUCKET, key)
         logger.info("File uploaded to R2 successfully")
         
-        # Construct the public URL for the uploaded file
+        # Get the file back from R2 for processing (avoids SSL issues with public URL)
+        logger.info("Retrieving file from R2 for processing...")
+        response = s3_client.get_object(Bucket=R2_BUCKET, Key=key)
+        pdf_data = response['Body'].read()
+        logger.info(f"Retrieved {len(pdf_data)} bytes from R2")
+        
+        # Convert PDF to markdown using the raw data instead of URL
+        logger.info("Starting PDF to markdown conversion using raw data")
+        converter = DocumentConverter()
+        md = converter.convert(io.BytesIO(pdf_data)).document.export_to_markdown()
+        logger.info(f"Conversion successful, markdown length: {len(md)} characters")
+        
+        # Construct public URL for response
         public_url = f"https://{R2_BUCKET}.{R2_ACCOUNT_ID}.r2.dev/{key}"
         logger.info(f"Public URL: {public_url}")
-        
-        # Convert PDF to markdown
-        logger.info("Starting PDF to markdown conversion")
-        converter = DocumentConverter()
-        md = converter.convert(public_url).document.export_to_markdown()
-        logger.info(f"Conversion successful, markdown length: {len(md)} characters")
         
         return JSONResponse({"file_url": public_url, "markdown": md})
         
