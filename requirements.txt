@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+boto3>=1.35  # R2 compatibility :contentReference[oaicite:2]{index=2}
+python-multipart
+docling>=1.16  # PDF ➜ Markdown support :contentReference[oaicite:3]{index=3}
