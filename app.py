@@ -1,7 +1,5 @@
 import os, uuid, io
 import logging
-import tempfile
-import requests
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -133,28 +131,13 @@ async def upload(file: UploadFile = File(...)):
         public_url = f"https://{R2_BUCKET}.{R2_ACCOUNT_ID}.r2.dev/{key}"
         logger.info(f"Public URL: {public_url}")
         
-        # Download file locally to avoid SSL issues with Docling
-        logger.info("Downloading file locally to avoid SSL issues...")
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
-            temp_file.write(data)
-            temp_file_path = temp_file.name
+        # Convert PDF to markdown
+        logger.info("Starting PDF to markdown conversion")
+        converter = DocumentConverter()
+        md = converter.convert(public_url).document.export_to_markdown()
+        logger.info(f"Conversion successful, markdown length: {len(md)} characters")
         
-        try:
-            # Convert PDF to markdown using local file
-            logger.info("Starting PDF to markdown conversion using local file")
-            converter = DocumentConverter()
-            md = converter.convert(temp_file_path).document.export_to_markdown()
-            logger.info(f"Conversion successful, markdown length: {len(md)} characters")
-            
-            return JSONResponse({"file_url": public_url, "markdown": md})
-            
-        finally:
-            # Clean up temporary file
-            try:
-                os.unlink(temp_file_path)
-                logger.info("Temporary file cleaned up")
-            except Exception as e:
-                logger.warning(f"Failed to clean up temporary file: {e}")
+        return JSONResponse({"file_url": public_url, "markdown": md})
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is
