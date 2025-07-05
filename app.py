@@ -2,45 +2,59 @@ import os, uuid, io
 import logging
 import tempfile
 import base64
+import traceback
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging with more detail
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Log startup
-logger.info("Starting PDF to Markdown converter application...")
+logger.info("=" * 50)
+logger.info("Starting Document to Markdown converter application...")
+logger.info("=" * 50)
 
 # Try to import required libraries with error handling
+logger.info("Importing required libraries...")
+
 try:
     import openai
-    logger.info("OpenAI imported successfully")
+    logger.info("✅ OpenAI imported successfully")
 except ImportError as e:
-    logger.error(f"Failed to import openai: {e}")
+    logger.error(f"❌ Failed to import openai: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
     raise
 
 try:
     import fitz  # PyMuPDF for PDFs
-    logger.info("PyMuPDF imported successfully")
+    logger.info("✅ PyMuPDF imported successfully")
 except ImportError as e:
-    logger.error(f"Failed to import PyMuPDF: {e}")
+    logger.error(f"❌ Failed to import PyMuPDF: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
     raise
 
 try:
     from pptx import Presentation
-    logger.info("python-pptx imported successfully")
+    logger.info("✅ python-pptx imported successfully")
 except ImportError as e:
-    logger.error(f"Failed to import python-pptx: {e}")
+    logger.error(f"❌ Failed to import python-pptx: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
     raise
 
 try:
     from PIL import Image
-    logger.info("Pillow imported successfully")
+    logger.info("✅ Pillow imported successfully")
 except ImportError as e:
-    logger.error(f"Failed to import Pillow: {e}")
+    logger.error(f"❌ Failed to import Pillow: {e}")
+    logger.error(f"Traceback: {traceback.format_exc()}")
     raise
+
+logger.info("All libraries imported successfully!")
 
 app = FastAPI(title="Document to Markdown Converter")
 
@@ -60,121 +74,197 @@ def initialize_openai():
     """Initialize OpenAI client with proper error handling"""
     global openai_client
     
+    logger.info("Initializing OpenAI client...")
+    
     try:
         OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
         logger.info(f"OPENAI_API_KEY configured: {OPENAI_API_KEY is not None}")
         
         if not OPENAI_API_KEY:
+            logger.error("❌ Missing OPENAI_API_KEY environment variable")
             raise ValueError("Missing required OPENAI_API_KEY environment variable")
         
+        logger.info("Creating OpenAI client...")
         openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        logger.info("OpenAI client initialized successfully")
+        
+        # Test the client with a simple call
+        logger.info("Testing OpenAI client...")
+        test_response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "Hello"}],
+            max_tokens=10
+        )
+        logger.info("✅ OpenAI client test successful")
         
         return True
         
     except Exception as e:
-        logger.error(f"Failed to initialize OpenAI client: {e}")
+        logger.error(f"❌ Failed to initialize OpenAI client: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup"""
+    logger.info("=" * 50)
     logger.info("Application starting up...")
-    if not initialize_openai():
-        logger.error("Failed to initialize OpenAI - application may not work properly")
+    logger.info("=" * 50)
+    
+    try:
+        if not initialize_openai():
+            logger.error("❌ Failed to initialize OpenAI - application may not work properly")
+        else:
+            logger.info("✅ All services initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Startup error: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
 @app.get("/", response_class=HTMLResponse)
 def index():
     logger.info("Serving index page")
     try:
         with open("static/index.html", encoding="utf8") as f:
-            return f.read()
+            content = f.read()
+            logger.info(f"✅ Index page loaded successfully ({len(content)} characters)")
+            return content
     except Exception as e:
-        logger.error(f"Error reading index.html: {e}")
+        logger.error(f"❌ Error reading index.html: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(500, "Internal server error")
 
 def image_to_base64(image: Image.Image) -> str:
     """Convert PIL Image to base64 string"""
-    buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+    try:
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        base64_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        logger.info(f"✅ Image converted to base64 ({len(base64_str)} characters)")
+        return base64_str
+    except Exception as e:
+        logger.error(f"❌ Error converting image to base64: {e}")
+        raise
 
 def pdf_to_images(pdf_data: bytes):
     """Convert PDF bytes to list of PIL Images"""
-    doc = fitz.open(stream=pdf_data, filetype="pdf")
-    images = []
-    for page in doc:
-        pix = page.get_pixmap()
-        img_data = pix.pil_tobytes("png")
-        image = Image.open(io.BytesIO(img_data))
-        images.append(image)
-    doc.close()
-    return images
+    try:
+        logger.info(f"Opening PDF with {len(pdf_data)} bytes...")
+        doc = fitz.open(stream=pdf_data, filetype="pdf")
+        images = []
+        
+        for page_num in range(len(doc)):
+            logger.info(f"Processing page {page_num + 1}/{len(doc)}...")
+            page = doc[page_num]
+            pix = page.get_pixmap()
+            img_data = pix.pil_tobytes("png")
+            image = Image.open(io.BytesIO(img_data))
+            images.append(image)
+            logger.info(f"✅ Page {page_num + 1} converted to image")
+        
+        doc.close()
+        logger.info(f"✅ PDF converted to {len(images)} images")
+        return images
+    except Exception as e:
+        logger.error(f"❌ Error converting PDF to images: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
 
 def pptx_slide_texts(pptx_data: bytes):
     """Extract text from PowerPoint bytes"""
-    with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as temp_file:
-        temp_file.write(pptx_data)
-        temp_file_path = temp_file.name
-    
+    temp_file_path = None
     try:
+        logger.info("Creating temporary PPTX file...")
+        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as temp_file:
+            temp_file.write(pptx_data)
+            temp_file_path = temp_file.name
+        
+        logger.info("Opening PowerPoint presentation...")
         prs = Presentation(temp_file_path)
         slides_text = []
-        for slide in prs.slides:
+        
+        for slide_num, slide in enumerate(prs.slides):
+            logger.info(f"Processing slide {slide_num + 1}/{len(prs.slides)}...")
             text = []
             for shape in slide.shapes:
                 if hasattr(shape, "text"):
                     text.append(shape.text)
             slides_text.append("\n".join(text))
+            logger.info(f"✅ Slide {slide_num + 1} text extracted")
+        
+        logger.info(f"✅ PowerPoint converted to {len(slides_text)} slides")
         return slides_text
+    except Exception as e:
+        logger.error(f"❌ Error extracting PowerPoint text: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
     finally:
-        try:
-            os.unlink(temp_file_path)
-        except:
-            pass
+        if temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+                logger.info("✅ Temporary PPTX file cleaned up")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to clean up temporary PPTX file: {e}")
 
 def call_openai_with_text(text: str) -> str:
     """Call OpenAI API with text content"""
-    response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You're a document-to-Markdown converter. Convert the given content to clean, well-formatted Markdown while preserving structure, headings, lists, and formatting."},
-            {"role": "user", "content": f"Convert this to Markdown:\n\n{text}"}
-        ],
-        max_tokens=4000
-    )
-    return response.choices[0].message.content
+    try:
+        logger.info(f"Calling OpenAI with text ({len(text)} characters)...")
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You're a document-to-Markdown converter. Convert the given content to clean, well-formatted Markdown while preserving structure, headings, lists, and formatting."},
+                {"role": "user", "content": f"Convert this to Markdown:\n\n{text}"}
+            ],
+            max_tokens=4000
+        )
+        result = response.choices[0].message.content
+        logger.info(f"✅ OpenAI text conversion successful ({len(result)} characters)")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Error calling OpenAI with text: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
 
 def call_openai_with_image(base64_image: str) -> str:
     """Call OpenAI API with image content"""
-    response = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Extract all visible text and format it as clean Markdown. Preserve structure, headings, lists, and formatting."},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
-                ]
-            }
-        ],
-        max_tokens=4000
-    )
-    return response.choices[0].message.content
+    try:
+        logger.info(f"Calling OpenAI with image ({len(base64_image)} base64 characters)...")
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract all visible text and format it as clean Markdown. Preserve structure, headings, lists, and formatting."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+                    ]
+                }
+            ],
+            max_tokens=4000
+        )
+        result = response.choices[0].message.content
+        logger.info(f"✅ OpenAI image conversion successful ({len(result)} characters)")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Error calling OpenAI with image: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
+    logger.info("=" * 50)
     logger.info(f"Upload request received for file: {file.filename}")
+    logger.info("=" * 50)
     
     # Check if OpenAI is properly initialized
     if not openai_client:
-        logger.error("OpenAI client not initialized")
+        logger.error("❌ OpenAI client not initialized")
         raise HTTPException(500, "AI service not available")
     
     try:
         # Read file data
+        logger.info("Reading file data...")
         data = await file.read()
-        logger.info(f"File size: {len(data)} bytes")
+        logger.info(f"✅ File read successfully ({len(data)} bytes)")
         
         # Determine file type and process accordingly
         file_extension = file.filename.lower().split('.')[-1] if '.' in file.filename else ''
@@ -191,7 +281,7 @@ async def upload(file: UploadFile = File(...)):
             # Process each page with OpenAI
             markdown_parts = []
             for i, image in enumerate(images):
-                logger.info(f"Processing page {i+1}/{len(images)}...")
+                logger.info(f"Processing page {i+1}/{len(images)} with OpenAI...")
                 base64_image = image_to_base64(image)
                 page_markdown = call_openai_with_image(base64_image)
                 markdown_parts.append(f"## Page {i+1}\n\n{page_markdown}")
@@ -216,30 +306,37 @@ async def upload(file: UploadFile = File(...)):
                 text_content = data.decode('utf-8')
                 md = call_openai_with_text(text_content)
             except UnicodeDecodeError:
+                logger.error(f"❌ Unsupported file type: {content_type}")
                 raise HTTPException(400, "Unsupported file type. Please upload PDF, PowerPoint, or text files.")
         
-        logger.info(f"Conversion successful, markdown length: {len(md)} characters")
+        logger.info(f"✅ Conversion successful, markdown length: {len(md)} characters")
         
         # Generate a unique file ID for reference
         file_id = str(uuid.uuid4())
         
-        return JSONResponse({
+        response_data = {
             "file_id": file_id,
             "filename": file.filename,
             "markdown": md,
             "pages_processed": len(images) if 'images' in locals() else 1
-        })
+        }
+        
+        logger.info("✅ Returning successful response")
+        return JSONResponse(response_data)
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is
+        logger.info("Re-raising HTTP exception")
         raise
     except Exception as e:
-        logger.error(f"Unexpected error during upload: {str(e)}", exc_info=True)
+        logger.error(f"❌ Unexpected error during upload: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(500, f"Internal server error: {str(e)}")
 
 # Add health check endpoint
 @app.get("/health")
 async def health_check():
+    logger.info("Health check requested")
     return {
         "status": "healthy",
         "openai_configured": openai_client is not None,
