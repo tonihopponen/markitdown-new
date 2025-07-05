@@ -4,33 +4,23 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import boto3
-from docling.document_converter import DocumentConverter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ---- Cloudflare R2 configuration (env vars set on Render) ----
-# Use the jurisdiction-specific endpoint instead of the generic one
-R2_ENDPOINT = os.getenv("R2_ENDPOINT_URL")  # This should be your jurisdiction-specific URL
-R2_BUCKET = os.getenv("R2_BUCKET_NAME")
-R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
+# Log startup
+logger.info("Starting PDF to Markdown converter application...")
 
-# Log configuration (without sensitive data)
-logger.info(f"R2_ENDPOINT configured: {R2_ENDPOINT is not None}")
-logger.info(f"R2_BUCKET configured: {R2_BUCKET is not None}")
-logger.info(f"R2_ACCOUNT_ID configured: {R2_ACCOUNT_ID is not None}")
+# Try to import docling with error handling
+try:
+    from docling.document_converter import DocumentConverter
+    logger.info("Docling imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import docling: {e}")
+    raise
 
-s3 = boto3.client(
-    "s3",
-    endpoint_url=R2_ENDPOINT,
-    aws_access_key_id=os.getenv("R2_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("R2_SECRET_ACCESS_KEY"),
-    region_name="auto",
-    config=boto3.session.Config(s3={"addressing_style": "virtual"}),
-)
-
-app = FastAPI()
+app = FastAPI(title="PDF to Markdown Converter")
 
 # Add CORS middleware
 app.add_middleware(
@@ -40,6 +30,64 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global variables for R2 configuration
+R2_ENDPOINT = None
+R2_BUCKET = None
+R2_ACCOUNT_ID = None
+s3_client = None
+
+def initialize_r2():
+    """Initialize R2 client with proper error handling"""
+    global R2_ENDPOINT, R2_BUCKET, R2_ACCOUNT_ID, s3_client
+    
+    try:
+        R2_ENDPOINT = os.getenv("R2_ENDPOINT_URL")
+        R2_BUCKET = os.getenv("R2_BUCKET_NAME")
+        R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
+        R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+        R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+        
+        # Log configuration (without sensitive data)
+        logger.info(f"R2_ENDPOINT configured: {R2_ENDPOINT is not None}")
+        logger.info(f"R2_BUCKET configured: {R2_BUCKET is not None}")
+        logger.info(f"R2_ACCOUNT_ID configured: {R2_ACCOUNT_ID is not None}")
+        logger.info(f"R2_ACCESS_KEY_ID configured: {R2_ACCESS_KEY_ID is not None}")
+        logger.info(f"R2_SECRET_ACCESS_KEY configured: {R2_SECRET_ACCESS_KEY is not None}")
+        
+        # Validate required environment variables
+        if not all([R2_ENDPOINT, R2_BUCKET, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY]):
+            missing_vars = []
+            if not R2_ENDPOINT: missing_vars.append("R2_ENDPOINT_URL")
+            if not R2_BUCKET: missing_vars.append("R2_BUCKET_NAME")
+            if not R2_ACCOUNT_ID: missing_vars.append("R2_ACCOUNT_ID")
+            if not R2_ACCESS_KEY_ID: missing_vars.append("R2_ACCESS_KEY_ID")
+            if not R2_SECRET_ACCESS_KEY: missing_vars.append("R2_SECRET_ACCESS_KEY")
+            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+        
+        # Create S3 client
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=R2_ENDPOINT,
+            aws_access_key_id=R2_ACCESS_KEY_ID,
+            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+            region_name="auto",
+            config=boto3.session.Config(s3={"addressing_style": "virtual"}),
+        )
+        
+        logger.info("R2 client initialized successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize R2 client: {e}")
+        return False
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logger.info("Application starting up...")
+    if not initialize_r2():
+        logger.error("Failed to initialize R2 - application may not work properly")
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -54,6 +102,11 @@ def index():
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     logger.info(f"Upload request received for file: {file.filename}")
+    
+    # Check if R2 is properly initialized
+    if not s3_client:
+        logger.error("R2 client not initialized")
+        raise HTTPException(500, "Storage service not available")
     
     try:
         # Validate file type
@@ -71,7 +124,7 @@ async def upload(file: UploadFile = File(...)):
         
         # Upload to R2
         logger.info(f"Uploading to R2 bucket: {R2_BUCKET}")
-        s3.upload_fileobj(io.BytesIO(data), R2_BUCKET, key)
+        s3_client.upload_fileobj(io.BytesIO(data), R2_BUCKET, key)
         logger.info("File uploaded to R2 successfully")
         
         # Construct the public URL for the uploaded file
@@ -96,4 +149,12 @@ async def upload(file: UploadFile = File(...)):
 # Add health check endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "r2_configured": s3_client is not None,
+        "environment_vars": {
+            "r2_endpoint": R2_ENDPOINT is not None,
+            "r2_bucket": R2_BUCKET is not None,
+            "r2_account_id": R2_ACCOUNT_ID is not None
+        }
+    }
