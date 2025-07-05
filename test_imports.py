@@ -22,14 +22,14 @@ except ImportError as e:
     print(f"❌ boto3 import failed: {e}")
     sys.exit(1)
 
-print("Loading docling (this may take a moment due to ML dependencies)...")
+print("Loading apify-client...")
 start_time = time.time()
 try:
-    from docling.document_converter import DocumentConverter
+    from apify_client import ApifyClient
     load_time = time.time() - start_time
-    print(f"✅ docling imported successfully (took {load_time:.2f}s)")
+    print(f"✅ apify-client imported successfully (took {load_time:.2f}s)")
 except ImportError as e:
-    print(f"❌ docling import failed: {e}")
+    print(f"❌ apify-client import failed: {e}")
     sys.exit(1)
 
 try:
@@ -46,7 +46,8 @@ env_vars = [
     "R2_BUCKET_NAME", 
     "R2_ACCOUNT_ID",
     "R2_ACCESS_KEY_ID",
-    "R2_SECRET_ACCESS_KEY"
+    "R2_SECRET_ACCESS_KEY",
+    "APIFY_API_TOKEN"
 ]
 
 for var in env_vars:

@@ -2,4 +2,4 @@ fastapi
 uvicorn[standard]
 boto3>=1.35
 python-multipart
-docling>=1.16
+apify-client>=1.7.0
