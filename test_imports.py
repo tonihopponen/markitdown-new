@@ -4,6 +4,7 @@ Test script to verify all imports and basic functionality
 """
 import sys
 import os
+import time
 
 print("Testing imports...")
 
@@ -21,9 +22,12 @@ except ImportError as e:
     print(f"❌ boto3 import failed: {e}")
     sys.exit(1)
 
+print("Loading docling (this may take a moment due to ML dependencies)...")
+start_time = time.time()
 try:
     from docling.document_converter import DocumentConverter
-    print("✅ docling imported successfully")
+    load_time = time.time() - start_time
+    print(f"✅ docling imported successfully (took {load_time:.2f}s)")
 except ImportError as e:
     print(f"❌ docling import failed: {e}")
     sys.exit(1)
