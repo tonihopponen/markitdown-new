@@ -1,11 +1,10 @@
 import os, uuid, io
 import logging
 import tempfile
-import requests
+import base64
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-import boto3
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -14,15 +13,36 @@ logger = logging.getLogger(__name__)
 # Log startup
 logger.info("Starting PDF to Markdown converter application...")
 
-# Try to import apify client with error handling
+# Try to import required libraries with error handling
 try:
-    from apify_client import ApifyClient
-    logger.info("Apify client imported successfully")
+    import openai
+    logger.info("OpenAI imported successfully")
 except ImportError as e:
-    logger.error(f"Failed to import apify-client: {e}")
+    logger.error(f"Failed to import openai: {e}")
     raise
 
-app = FastAPI(title="PDF to Markdown Converter")
+try:
+    import fitz  # PyMuPDF for PDFs
+    logger.info("PyMuPDF imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import PyMuPDF: {e}")
+    raise
+
+try:
+    from pptx import Presentation
+    logger.info("python-pptx imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import python-pptx: {e}")
+    raise
+
+try:
+    from PIL import Image
+    logger.info("Pillow imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import Pillow: {e}")
+    raise
+
+app = FastAPI(title="Document to Markdown Converter")
 
 # Add CORS middleware
 app.add_middleware(
@@ -33,76 +53,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global variables for R2 configuration
-R2_ENDPOINT = None
-R2_BUCKET = None
-R2_ACCOUNT_ID = None
-s3_client = None
-apify_client = None
+# Global variables
+openai_client = None
 
-def initialize_services():
-    """Initialize R2 client and Apify client with proper error handling"""
-    global R2_ENDPOINT, R2_BUCKET, R2_ACCOUNT_ID, s3_client, apify_client
+def initialize_openai():
+    """Initialize OpenAI client with proper error handling"""
+    global openai_client
     
     try:
-        # Initialize R2
-        R2_ENDPOINT = os.getenv("R2_ENDPOINT_URL")
-        R2_BUCKET = os.getenv("R2_BUCKET_NAME")
-        R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
-        R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
-        R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+        logger.info(f"OPENAI_API_KEY configured: {OPENAI_API_KEY is not None}")
         
-        # Log configuration (without sensitive data)
-        logger.info(f"R2_ENDPOINT configured: {R2_ENDPOINT is not None}")
-        logger.info(f"R2_BUCKET configured: {R2_BUCKET is not None}")
-        logger.info(f"R2_ACCOUNT_ID configured: {R2_ACCOUNT_ID is not None}")
-        logger.info(f"R2_ACCESS_KEY_ID configured: {R2_ACCESS_KEY_ID is not None}")
-        logger.info(f"R2_SECRET_ACCESS_KEY configured: {R2_SECRET_ACCESS_KEY is not None}")
+        if not OPENAI_API_KEY:
+            raise ValueError("Missing required OPENAI_API_KEY environment variable")
         
-        # Validate required R2 environment variables
-        if not all([R2_ENDPOINT, R2_BUCKET, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY]):
-            missing_vars = []
-            if not R2_ENDPOINT: missing_vars.append("R2_ENDPOINT_URL")
-            if not R2_BUCKET: missing_vars.append("R2_BUCKET_NAME")
-            if not R2_ACCOUNT_ID: missing_vars.append("R2_ACCOUNT_ID")
-            if not R2_ACCESS_KEY_ID: missing_vars.append("R2_ACCESS_KEY_ID")
-            if not R2_SECRET_ACCESS_KEY: missing_vars.append("R2_SECRET_ACCESS_KEY")
-            raise ValueError(f"Missing required R2 environment variables: {', '.join(missing_vars)}")
-        
-        # Create S3 client
-        s3_client = boto3.client(
-            "s3",
-            endpoint_url=R2_ENDPOINT,
-            aws_access_key_id=R2_ACCESS_KEY_ID,
-            aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-            region_name="auto",
-            config=boto3.session.Config(s3={"addressing_style": "virtual"}),
-        )
-        
-        logger.info("R2 client initialized successfully")
-        
-        # Initialize Apify
-        APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN")
-        logger.info(f"APIFY_API_TOKEN configured: {APIFY_API_TOKEN is not None}")
-        
-        if not APIFY_API_TOKEN:
-            raise ValueError("Missing required APIFY_API_TOKEN environment variable")
-        
-        apify_client = ApifyClient(APIFY_API_TOKEN)
-        logger.info("Apify client initialized successfully")
+        openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        logger.info("OpenAI client initialized successfully")
         
         return True
         
     except Exception as e:
-        logger.error(f"Failed to initialize services: {e}")
+        logger.error(f"Failed to initialize OpenAI client: {e}")
         return False
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup"""
     logger.info("Application starting up...")
-    if not initialize_services():
-        logger.error("Failed to initialize services - application may not work properly")
+    if not initialize_openai():
+        logger.error("Failed to initialize OpenAI - application may not work properly")
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -114,122 +93,142 @@ def index():
         logger.error(f"Error reading index.html: {e}")
         raise HTTPException(500, "Internal server error")
 
+def image_to_base64(image: Image.Image) -> str:
+    """Convert PIL Image to base64 string"""
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+def pdf_to_images(pdf_data: bytes):
+    """Convert PDF bytes to list of PIL Images"""
+    doc = fitz.open(stream=pdf_data, filetype="pdf")
+    images = []
+    for page in doc:
+        pix = page.get_pixmap()
+        img_data = pix.pil_tobytes("png")
+        image = Image.open(io.BytesIO(img_data))
+        images.append(image)
+    doc.close()
+    return images
+
+def pptx_slide_texts(pptx_data: bytes):
+    """Extract text from PowerPoint bytes"""
+    with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as temp_file:
+        temp_file.write(pptx_data)
+        temp_file_path = temp_file.name
+    
+    try:
+        prs = Presentation(temp_file_path)
+        slides_text = []
+        for slide in prs.slides:
+            text = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    text.append(shape.text)
+            slides_text.append("\n".join(text))
+        return slides_text
+    finally:
+        try:
+            os.unlink(temp_file_path)
+        except:
+            pass
+
+def call_openai_with_text(text: str) -> str:
+    """Call OpenAI API with text content"""
+    response = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You're a document-to-Markdown converter. Convert the given content to clean, well-formatted Markdown while preserving structure, headings, lists, and formatting."},
+            {"role": "user", "content": f"Convert this to Markdown:\n\n{text}"}
+        ],
+        max_tokens=4000
+    )
+    return response.choices[0].message.content
+
+def call_openai_with_image(base64_image: str) -> str:
+    """Call OpenAI API with image content"""
+    response = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Extract all visible text and format it as clean Markdown. Preserve structure, headings, lists, and formatting."},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+                ]
+            }
+        ],
+        max_tokens=4000
+    )
+    return response.choices[0].message.content
+
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     logger.info(f"Upload request received for file: {file.filename}")
     
-    # Check if services are properly initialized
-    if not s3_client or not apify_client:
-        logger.error("Services not initialized")
-        raise HTTPException(500, "Services not available")
+    # Check if OpenAI is properly initialized
+    if not openai_client:
+        logger.error("OpenAI client not initialized")
+        raise HTTPException(500, "AI service not available")
     
     try:
-        # Validate file type
-        if file.content_type != "application/pdf":
-            logger.warning(f"Invalid file type: {file.content_type}")
-            raise HTTPException(400, "Only PDF files allowed")
-        
-        # Generate unique key
-        key = f"{uuid.uuid4()}.pdf"
-        logger.info(f"Generated key: {key}")
-        
         # Read file data
         data = await file.read()
         logger.info(f"File size: {len(data)} bytes")
         
-        # Upload to R2 using the bucket name in the upload call
-        logger.info(f"Uploading to R2 bucket: {R2_BUCKET}")
-        s3_client.upload_fileobj(io.BytesIO(data), R2_BUCKET, key)
-        logger.info("File uploaded to R2 successfully")
+        # Determine file type and process accordingly
+        file_extension = file.filename.lower().split('.')[-1] if '.' in file.filename else ''
+        content_type = file.content_type.lower()
         
-        # Construct the public URL for the uploaded file
-        public_url = f"https://{R2_BUCKET}.{R2_ACCOUNT_ID}.r2.dev/{key}"
-        logger.info(f"Public URL: {public_url}")
+        logger.info(f"File type: {content_type}, extension: {file_extension}")
         
-        # Convert PDF to markdown using Apify Docling API
-        logger.info("Starting PDF to markdown conversion using Apify Docling API")
-        
-        # Prepare the Apify Actor input
-        run_input = {
-            "http_sources": [{ "url": public_url }],
-            "options": { "to_formats": ["md"] },
-        }
-        
-        # Run the Apify Actor and wait for it to finish
-        logger.info("Calling Apify Docling Actor...")
-        run = apify_client.actor("vancura/docling").call(run_input=run_input)
-        logger.info(f"Apify run completed with ID: {run['id']}")
-        
-        # Fetch results from the run's dataset
-        logger.info("Fetching conversion results...")
-        results = list(apify_client.dataset(run["defaultDatasetId"]).iterate_items())
-        
-        if not results:
-            raise HTTPException(500, "No results returned from Apify Docling")
-        
-        # Log the structure of the first result for debugging
-        logger.info(f"Apify result structure: {list(results[0].keys())}")
-        logger.info(f"First result: {results[0]}")
-        
-        # Extract the output file URL from the first result
-        result = results[0]
-        if "output_file" not in result:
-            logger.error(f"No output_file field found in Apify result. Available fields: {list(result.keys())}")
-            raise HTTPException(500, f"No output file found in Apify results. Available fields: {list(result.keys())}")
-        
-        output_file_url = result["output_file"]
-        logger.info(f"Output file URL: {output_file_url}")
-        
-        # Download the ZIP file from Apify
-        logger.info("Downloading ZIP file from Apify...")
-        response = requests.get(output_file_url)
-        if response.status_code != 200:
-            logger.error(f"Failed to download ZIP file. Status: {response.status_code}")
-            raise HTTPException(500, f"Failed to download output file from Apify. Status: {response.status_code}")
-        
-        # Save ZIP to temporary file and extract
-        import zipfile
-        import tempfile
-        
-        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_zip:
-            temp_zip.write(response.content)
-            temp_zip_path = temp_zip.name
-        
-        try:
-            # Extract the ZIP file
-            logger.info("Extracting ZIP file...")
-            with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
-                # List contents for debugging
-                file_list = zip_ref.namelist()
-                logger.info(f"ZIP contents: {file_list}")
-                
-                # Look for markdown file
-                markdown_file = None
-                for file_name in file_list:
-                    if file_name.endswith('.md') or file_name.endswith('.markdown'):
-                        markdown_file = file_name
-                        break
-                
-                if not markdown_file:
-                    logger.error(f"No markdown file found in ZIP. Contents: {file_list}")
-                    raise HTTPException(500, f"No markdown file found in output. ZIP contents: {file_list}")
-                
-                # Read the markdown content
-                with zip_ref.open(markdown_file) as md_file:
-                    md = md_file.read().decode('utf-8')
-                    logger.info(f"Found markdown file: {markdown_file}")
-        
-        finally:
-            # Clean up temporary ZIP file
+        if content_type == "application/pdf" or file_extension == "pdf":
+            # Process PDF
+            logger.info("Processing PDF file...")
+            images = pdf_to_images(data)
+            logger.info(f"Extracted {len(images)} pages from PDF")
+            
+            # Process each page with OpenAI
+            markdown_parts = []
+            for i, image in enumerate(images):
+                logger.info(f"Processing page {i+1}/{len(images)}...")
+                base64_image = image_to_base64(image)
+                page_markdown = call_openai_with_image(base64_image)
+                markdown_parts.append(f"## Page {i+1}\n\n{page_markdown}")
+            
+            md = "\n\n---\n\n".join(markdown_parts)
+            
+        elif content_type in ["application/vnd.openxmlformats-officedocument.presentationml.presentation", 
+                             "application/vnd.ms-powerpoint"] or file_extension in ["pptx", "ppt"]:
+            # Process PowerPoint
+            logger.info("Processing PowerPoint file...")
+            slides_text = pptx_slide_texts(data)
+            logger.info(f"Extracted {len(slides_text)} slides from PowerPoint")
+            
+            # Combine all slide text and convert to markdown
+            combined_text = "\n\n---\n\n".join([f"Slide {i+1}:\n{text}" for i, text in enumerate(slides_text)])
+            md = call_openai_with_text(combined_text)
+            
+        else:
+            # For other file types, try to extract text and convert
+            logger.info("Processing as text file...")
             try:
-                os.unlink(temp_zip_path)
-                logger.info("Temporary ZIP file cleaned up")
-            except Exception as e:
-                logger.warning(f"Failed to clean up temporary ZIP file: {e}")
+                text_content = data.decode('utf-8')
+                md = call_openai_with_text(text_content)
+            except UnicodeDecodeError:
+                raise HTTPException(400, "Unsupported file type. Please upload PDF, PowerPoint, or text files.")
         
         logger.info(f"Conversion successful, markdown length: {len(md)} characters")
         
-        return JSONResponse({"file_url": public_url, "markdown": md})
+        # Generate a unique file ID for reference
+        file_id = str(uuid.uuid4())
+        
+        return JSONResponse({
+            "file_id": file_id,
+            "filename": file.filename,
+            "markdown": md,
+            "pages_processed": len(images) if 'images' in locals() else 1
+        })
         
     except HTTPException:
         # Re-raise HTTP exceptions as-is
@@ -243,12 +242,8 @@ async def upload(file: UploadFile = File(...)):
 async def health_check():
     return {
         "status": "healthy",
-        "r2_configured": s3_client is not None,
-        "apify_configured": apify_client is not None,
+        "openai_configured": openai_client is not None,
         "environment_vars": {
-            "r2_endpoint": R2_ENDPOINT is not None,
-            "r2_bucket": R2_BUCKET is not None,
-            "r2_account_id": R2_ACCOUNT_ID is not None,
-            "apify_token": os.getenv("APIFY_API_TOKEN") is not None
+            "openai_api_key": os.getenv("OPENAI_API_KEY") is not None
         }
     }

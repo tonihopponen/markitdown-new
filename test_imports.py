@@ -16,20 +16,34 @@ except ImportError as e:
     sys.exit(1)
 
 try:
-    import boto3
-    print("✅ boto3 imported successfully")
+    import openai
+    print("✅ OpenAI imported successfully")
 except ImportError as e:
-    print(f"❌ boto3 import failed: {e}")
+    print(f"❌ OpenAI import failed: {e}")
     sys.exit(1)
 
-print("Loading apify-client...")
+print("Loading PyMuPDF...")
 start_time = time.time()
 try:
-    from apify_client import ApifyClient
+    import fitz
     load_time = time.time() - start_time
-    print(f"✅ apify-client imported successfully (took {load_time:.2f}s)")
+    print(f"✅ PyMuPDF imported successfully (took {load_time:.2f}s)")
 except ImportError as e:
-    print(f"❌ apify-client import failed: {e}")
+    print(f"❌ PyMuPDF import failed: {e}")
+    sys.exit(1)
+
+try:
+    from pptx import Presentation
+    print("✅ python-pptx imported successfully")
+except ImportError as e:
+    print(f"❌ python-pptx import failed: {e}")
+    sys.exit(1)
+
+try:
+    from PIL import Image
+    print("✅ Pillow imported successfully")
+except ImportError as e:
+    print(f"❌ Pillow import failed: {e}")
     sys.exit(1)
 
 try:
@@ -42,12 +56,7 @@ except ImportError as e:
 print("\n✅ All imports successful!")
 print("\nEnvironment variables check:")
 env_vars = [
-    "R2_ENDPOINT_URL",
-    "R2_BUCKET_NAME", 
-    "R2_ACCOUNT_ID",
-    "R2_ACCESS_KEY_ID",
-    "R2_SECRET_ACCESS_KEY",
-    "APIFY_API_TOKEN"
+    "OPENAI_API_KEY"
 ]
 
 for var in env_vars:
