@@ -23,40 +23,14 @@ logger.info("=" * 50)
 # Try to import required libraries with error handling
 logger.info("Importing required libraries...")
 
-# Global variables for optional dependencies
-Image = None
-pd = None
-openpyxl = None
-Document = None
-markdownify = None
+# Remove all import attempts, global variables, and code related to pandas, openpyxl, python-docx, and markdownify
 
 try:
-    import pandas as pd
-    logger.info("✅ pandas imported successfully")
+    from markitdown import MarkItDown
+    logger.info("✅ markitdown imported successfully")
 except ImportError as e:
-    logger.warning(f"⚠️ Failed to import pandas: {e}")
-    logger.warning("CSV/Excel functionality will be disabled")
-
-try:
-    import openpyxl
-    logger.info("✅ openpyxl imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Failed to import openpyxl: {e}")
-    logger.warning("Excel functionality will be disabled")
-
-try:
-    from docx import Document
-    logger.info("✅ python-docx imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Failed to import python-docx: {e}")
-    logger.warning("Word document functionality will be disabled")
-
-try:
-    from markdownify import markdownify
-    logger.info("✅ markdownify imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Failed to import markdownify: {e}")
-    logger.warning("HTML to markdown conversion will be disabled")
+    logger.error(f"❌ MarkItDown not installed: {e}")
+    raise HTTPException(500, "MarkItDown is not installed on the server.")
 
 try:
     import openai
@@ -222,11 +196,6 @@ async def upload(file: UploadFile = File(...)):
             # Process PDF using MarkItDown
             logger.info("Processing PDF file with MarkItDown...")
             try:
-                from markitdown import MarkItDown
-            except ImportError as e:
-                logger.error(f"❌ MarkItDown not installed: {e}")
-                raise HTTPException(500, "MarkItDown is not installed on the server.")
-            try:
                 md_converter = MarkItDown()
                 import io
                 pdf_stream = io.BytesIO(data)
@@ -244,11 +213,6 @@ async def upload(file: UploadFile = File(...)):
             # Process PowerPoint using MarkItDown
             logger.info("Processing PowerPoint file with MarkItDown...")
             try:
-                from markitdown import MarkItDown
-            except ImportError as e:
-                logger.error(f"❌ MarkItDown not installed: {e}")
-                raise HTTPException(500, "MarkItDown is not installed on the server.")
-            try:
                 md_converter = MarkItDown()
                 import io
                 pptx_stream = io.BytesIO(data)
@@ -265,11 +229,6 @@ async def upload(file: UploadFile = File(...)):
                              "application/msword"] or file_extension in ["docx", "doc"]:
             # Process Word document using MarkItDown
             logger.info("Processing Word document with MarkItDown...")
-            try:
-                from markitdown import MarkItDown
-            except ImportError as e:
-                logger.error(f"❌ MarkItDown not installed: {e}")
-                raise HTTPException(500, "MarkItDown is not installed on the server.")
             try:
                 md_converter = MarkItDown()
                 import io
@@ -294,11 +253,6 @@ async def upload(file: UploadFile = File(...)):
             # Process Excel using MarkItDown
             logger.info("Processing Excel file with MarkItDown...")
             try:
-                from markitdown import MarkItDown
-            except ImportError as e:
-                logger.error(f"❌ MarkItDown not installed: {e}")
-                raise HTTPException(500, "MarkItDown is not installed on the server.")
-            try:
                 md_converter = MarkItDown()
                 import io
                 excel_stream = io.BytesIO(data)
@@ -315,10 +269,7 @@ async def upload(file: UploadFile = File(...)):
             logger.info("Processing as text file...")
             try:
                 text_content = data.decode('utf-8')
-                if markdownify is not None:
-                    md = markdownify(text_content)
-                else:
-                    md = text_content
+                md = text_content
                 pages_processed = 1
             except UnicodeDecodeError:
                 logger.error(f"❌ Unsupported file type: {content_type}")

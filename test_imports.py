@@ -40,18 +40,6 @@ def main():
     print("\n--- AI/ML Dependencies ---")
     test_import("openai")
     
-    # Document processing
-    print("\n--- Document Processing ---")
-    test_import("docx", "python-docx")  # Word document processing
-    test_import("PIL", "Pillow")  # Image processing
-    
-    # Data processing
-    print("\n--- Data Processing ---")
-    test_import("pandas")
-    test_import("openpyxl")
-    test_import("markdownify")
-    test_import("tabulate")
-    
     print("\n" + "=" * 50)
     print("Import testing complete!")
     print("=" * 50)
