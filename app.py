@@ -24,7 +24,6 @@ logger.info("=" * 50)
 logger.info("Importing required libraries...")
 
 # Global variables for optional dependencies
-openai = None
 fitz = None
 Presentation = None
 Image = None
@@ -32,13 +31,6 @@ pd = None
 openpyxl = None
 Document = None
 markdownify = None
-
-try:
-    import openai
-    logger.info("✅ OpenAI imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Failed to import openai: {e}")
-    logger.warning("OpenAI functionality will be disabled")
 
 try:
     import fitz  # PyMuPDF for PDFs
@@ -89,6 +81,47 @@ except ImportError as e:
     logger.warning(f"⚠️ Failed to import markdownify: {e}")
     logger.warning("HTML to markdown conversion will be disabled")
 
+try:
+    import openai
+except ImportError:
+    openai = None
+    logger.warning("⚠️ OpenAI library not installed. Summarization will be disabled.")
+
+async def summarize_markdown(text: str, max_chars: int = 3000) -> str:
+    """Summarize markdown text to fit within max_chars using OpenAI (new API >=1.0.0)."""
+    if openai is None:
+        logger.error("OpenAI library not available for summarization.")
+        raise RuntimeError("OpenAI library not available.")
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        logger.error("OPENAI_API_KEY not set in environment.")
+        raise RuntimeError("OPENAI_API_KEY not set.")
+    prompt = (
+        f"Summarize the following markdown content in at most {max_chars} characters. "
+        "Preserve as much structure and key information as possible.\n\n" + text
+    )
+    import asyncio
+    try:
+        logger.info(f"Calling OpenAI (new API) to summarize markdown (original length: {len(text)} chars)...")
+        client = openai.OpenAI(api_key=api_key)
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=16384,  # <-- updated to max allowed
+            temperature=0,
+        )
+        if response.choices and response.choices[0].message and response.choices[0].message.content:
+            summary = response.choices[0].message.content.strip()
+        else:
+            logger.error("OpenAI response missing expected content for summarization.")
+            raise RuntimeError("OpenAI response missing expected content for summarization.")
+        logger.info(f"✅ OpenAI summarization complete (summary length: {len(summary)} chars)")
+        return summary
+    except Exception as e:
+        logger.error(f"❌ OpenAI summarization failed: {e}")
+        raise
+
 logger.info("Library import check completed!")
 
 app = FastAPI(title="Document to Markdown Converter")
@@ -103,69 +136,7 @@ app.add_middleware(
 )
 
 # Global variables
-openai_client = None
 
-def initialize_openai():
-    """Initialize OpenAI client with proper error handling"""
-    global openai_client
-    
-    logger.info("Initializing OpenAI client...")
-    
-    try:
-        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-        logger.info(f"OPENAI_API_KEY configured: {OPENAI_API_KEY is not None}")
-        
-        if not OPENAI_API_KEY:
-            logger.error("❌ Missing OPENAI_API_KEY environment variable")
-            raise ValueError("Missing required OPENAI_API_KEY environment variable")
-        
-        logger.info("Creating OpenAI client...")
-        openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        
-        # Test the client with a simple call
-        logger.info("Testing OpenAI client...")
-        test_response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": "Hello"}],
-            max_tokens=10
-        )
-        logger.info("✅ OpenAI client test successful")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize OpenAI client: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return False
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    logger.info("=" * 50)
-    logger.info("Application starting up...")
-    logger.info("=" * 50)
-    
-    try:
-        if not initialize_openai():
-            logger.error("❌ Failed to initialize OpenAI - application may not work properly")
-        else:
-            logger.info("✅ All services initialized successfully")
-    except Exception as e:
-        logger.error(f"❌ Startup error: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-
-@app.get("/", response_class=HTMLResponse)
-def index():
-    logger.info("Serving index page")
-    try:
-        with open("static/index.html", encoding="utf8") as f:
-            content = f.read()
-            logger.info(f"✅ Index page loaded successfully ({len(content)} characters)")
-            return content
-    except Exception as e:
-        logger.error(f"❌ Error reading index.html: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(500, "Internal server error")
 
 def image_to_base64(image) -> str:
     """Convert PIL Image to base64 string"""
@@ -197,7 +168,7 @@ def pdf_to_images(pdf_data: bytes):
         for page_num in range(len(doc)):
             logger.info(f"Processing page {page_num + 1}/{len(doc)}...")
             page = doc[page_num]
-            pix = page.get_pixmap()
+            pix = page.get_pixmap()  # type: ignore
             img_data = pix.pil_tobytes("png")
             image = Image.open(io.BytesIO(img_data))
             images.append(image)
@@ -232,7 +203,7 @@ def pptx_slide_texts(pptx_data: bytes):
             text = []
             for shape in slide.shapes:
                 if hasattr(shape, "text"):
-                    text.append(shape.text)
+                    text.append(shape.text)  # type: ignore
             slides_text.append("\n".join(text))
             logger.info(f"✅ Slide {slide_num + 1} text extracted")
         
@@ -272,7 +243,7 @@ def docx_to_markdown(docx_data: bytes) -> str:
         for para in doc.paragraphs:
             if para.text.strip():  # Only add non-empty paragraphs
                 # Check for heading styles
-                if para.style.name.startswith('Heading'):
+                if para.style and getattr(para.style, 'name', None) and isinstance(para.style.name, str) and para.style.name.startswith('Heading'):
                     level = para.style.name[-1] if para.style.name[-1].isdigit() else '1'
                     paragraphs.append(f"{'#' * int(level)} {para.text}")
                 else:
@@ -418,7 +389,8 @@ def excel_to_markdown(excel_data: bytes) -> str:
                 table_lines.append('| ' + ' | '.join(row_str) + ' |')
             
             markdown_table = '\n'.join(table_lines)
-        
+        if markdown_table is None:
+            markdown_table = ""
         logger.info(f"✅ Excel converted to markdown ({len(markdown_table)} characters)")
         return markdown_table
         
@@ -434,67 +406,41 @@ def excel_to_markdown(excel_data: bytes) -> str:
             except Exception as e:
                 logger.warning(f"⚠️ Failed to clean up temporary Excel file: {e}")
 
-def call_openai_with_text(text: str) -> str:
-    """Call OpenAI API with text content"""
-    if openai_client is None:
-        raise ImportError("OpenAI client is not available")
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logger.info("=" * 50)
+    logger.info("Application starting up...")
+    logger.info("=" * 50)
     
     try:
-        logger.info(f"Calling OpenAI with text ({len(text)} characters)...")
-        response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You're a document-to-Markdown converter. Convert the given content to clean, well-formatted Markdown while preserving structure, headings, lists, and formatting."},
-                {"role": "user", "content": f"Convert this to Markdown:\n\n{text}"}
-            ],
-            max_tokens=4000
-        )
-        result = response.choices[0].message.content
-        logger.info(f"✅ OpenAI text conversion successful ({len(result)} characters)")
-        return result
+        # Remove openai import and related variables
+        # Remove initialize_openai and openai_client
+        # Remove call_openai_with_text and call_openai_with_image
+        # Remove OpenAI logic from /upload and health check
+        pass # No OpenAI initialization needed
     except Exception as e:
-        logger.error(f"❌ Error calling OpenAI with text: {e}")
+        logger.error(f"❌ Startup error: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
 
-def call_openai_with_image(base64_image: str) -> str:
-    """Call OpenAI API with image content"""
-    if openai_client is None:
-        raise ImportError("OpenAI client is not available")
-    
+@app.get("/", response_class=HTMLResponse)
+def index():
+    logger.info("Serving index page")
     try:
-        logger.info(f"Calling OpenAI with image ({len(base64_image)} base64 characters)...")
-        response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Extract all visible text and format it as clean Markdown. Preserve structure, headings, lists, and formatting."},
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
-                    ]
-                }
-            ],
-            max_tokens=4000
-        )
-        result = response.choices[0].message.content
-        logger.info(f"✅ OpenAI image conversion successful ({len(result)} characters)")
-        return result
+        with open("static/index.html", encoding="utf8") as f:
+            content = f.read()
+            logger.info(f"✅ Index page loaded successfully ({len(content)} characters)")
+            return content
     except Exception as e:
-        logger.error(f"❌ Error calling OpenAI with image: {e}")
+        logger.error(f"❌ Error reading index.html: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
+        raise HTTPException(500, "Internal server error")
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     logger.info("=" * 50)
     logger.info(f"Upload request received for file: {file.filename}")
     logger.info("=" * 50)
-    
-    # Check if OpenAI is properly initialized
-    if not openai_client:
-        logger.error("❌ OpenAI client not initialized")
-        raise HTTPException(500, "AI service not available")
     
     try:
         # Read file data
@@ -503,73 +449,104 @@ async def upload(file: UploadFile = File(...)):
         logger.info(f"✅ File read successfully ({len(data)} bytes)")
         
         # Determine file type and process accordingly
+        if not file.filename or not file.content_type:
+            logger.error("❌ Uploaded file is missing filename or content_type")
+            raise HTTPException(400, "Uploaded file is missing filename or content_type")
         file_extension = file.filename.lower().split('.')[-1] if '.' in file.filename else ''
         content_type = file.content_type.lower()
         
         logger.info(f"File type: {content_type}, extension: {file_extension}")
         
         if content_type == "application/pdf" or file_extension == "pdf":
-            # Process PDF
-            logger.info("Processing PDF file...")
-            images = pdf_to_images(data)
-            logger.info(f"Extracted {len(images)} pages from PDF")
-            
-            # Process each page with OpenAI
-            markdown_parts = []
-            for i, image in enumerate(images):
-                logger.info(f"Processing page {i+1}/{len(images)} with OpenAI...")
-                base64_image = image_to_base64(image)
-                page_markdown = call_openai_with_image(base64_image)
-                markdown_parts.append(f"## Page {i+1}\n\n{page_markdown}")
-            
-            md = "\n\n---\n\n".join(markdown_parts)
-            pages_processed = len(images)
-            
+            # Process PDF using MarkItDown
+            logger.info("Processing PDF file with MarkItDown...")
+            try:
+                from markitdown import MarkItDown
+            except ImportError as e:
+                logger.error(f"❌ MarkItDown not installed: {e}")
+                raise HTTPException(500, "MarkItDown is not installed on the server.")
+            try:
+                md_converter = MarkItDown()
+                import io
+                pdf_stream = io.BytesIO(data)
+                result = md_converter.convert(pdf_stream)
+                md = result.text_content
+                pages_processed = 1  # MarkItDown does not split by page, so treat as one doc
+                logger.info(f"✅ PDF converted to markdown using MarkItDown ({len(md)} characters)")
+            except Exception as e:
+                logger.error(f"❌ Error converting PDF with MarkItDown: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise HTTPException(500, f"Failed to convert PDF: {str(e)}")
+        
         elif content_type in ["application/vnd.openxmlformats-officedocument.presentationml.presentation", 
                              "application/vnd.ms-powerpoint"] or file_extension in ["pptx", "ppt"]:
-            # Process PowerPoint
-            logger.info("Processing PowerPoint file...")
-            slides_text = pptx_slide_texts(data)
-            logger.info(f"Extracted {len(slides_text)} slides from PowerPoint")
-            
-            # Combine all slide text and convert to markdown
-            combined_text = "\n\n---\n\n".join([f"Slide {i+1}:\n{text}" for i, text in enumerate(slides_text)])
-            md = call_openai_with_text(combined_text)
-            pages_processed = len(slides_text)
-            
+            # Process PowerPoint using MarkItDown
+            logger.info("Processing PowerPoint file with MarkItDown...")
+            try:
+                from markitdown import MarkItDown
+            except ImportError as e:
+                logger.error(f"❌ MarkItDown not installed: {e}")
+                raise HTTPException(500, "MarkItDown is not installed on the server.")
+            try:
+                md_converter = MarkItDown()
+                import io
+                pptx_stream = io.BytesIO(data)
+                result = md_converter.convert(pptx_stream)
+                md = result.text_content
+                pages_processed = 1  # MarkItDown does not split by slide, so treat as one doc
+                logger.info(f"✅ PowerPoint converted to markdown using MarkItDown ({len(md)} characters)")
+            except Exception as e:
+                logger.error(f"❌ Error converting PowerPoint with MarkItDown: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise HTTPException(500, f"Failed to convert PowerPoint: {str(e)}")
+        
         elif content_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                              "application/msword"] or file_extension in ["docx", "doc"]:
             # Process Word document
             logger.info("Processing Word document...")
             md = docx_to_markdown(data)
             pages_processed = 1
-            
+        
         elif content_type == "text/csv" or file_extension == "csv":
             # Process CSV
             logger.info("Processing CSV file...")
             md = csv_to_markdown(data)
             pages_processed = 1
-            
+        
         elif content_type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              "application/vnd.ms-excel"] or file_extension in ["xlsx", "xls"]:
             # Process Excel
             logger.info("Processing Excel file...")
             md = excel_to_markdown(data)
             pages_processed = 1
-            
+        
         else:
             # For other file types, try to extract text and convert
             logger.info("Processing as text file...")
             try:
                 text_content = data.decode('utf-8')
-                md = call_openai_with_text(text_content)
+                if markdownify is not None:
+                    md = markdownify(text_content)
+                else:
+                    md = text_content
                 pages_processed = 1
             except UnicodeDecodeError:
                 logger.error(f"❌ Unsupported file type: {content_type}")
                 raise HTTPException(400, "Unsupported file type. Please upload PDF, PowerPoint, Word, CSV, Excel, or text files.")
         
         logger.info(f"✅ Conversion successful, markdown length: {len(md)} characters")
-        
+
+        # Summarize if markdown is too long
+        summarized = False
+        if len(md) > 3000:
+            logger.info(f"Markdown exceeds 3000 characters, summarizing...")
+            try:
+                md = await summarize_markdown(md, max_chars=3000)
+                summarized = True
+            except Exception as e:
+                logger.error(f"Summarization failed, returning original markdown: {e}")
+                summarized = False
+
         # Generate a unique file ID for reference
         file_id = str(uuid.uuid4())
         
@@ -577,7 +554,9 @@ async def upload(file: UploadFile = File(...)):
             "file_id": file_id,
             "filename": file.filename,
             "markdown": md,
-            "pages_processed": pages_processed
+            "pages_processed": pages_processed,
+            "markdown_length": len(md),
+            "summarized": summarized
         }
         
         logger.info("✅ Returning successful response")
@@ -597,9 +576,5 @@ async def upload(file: UploadFile = File(...)):
 async def health_check():
     logger.info("Health check requested")
     return {
-        "status": "healthy",
-        "openai_configured": openai_client is not None,
-        "environment_vars": {
-            "openai_api_key": os.getenv("OPENAI_API_KEY") is not None
-        }
+        "status": "healthy"
     }
