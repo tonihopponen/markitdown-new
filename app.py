@@ -187,63 +187,7 @@ def csv_to_markdown(csv_data: bytes) -> str:
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
-def excel_to_markdown(excel_data: bytes) -> str:
-    """Convert Excel data to markdown table"""
-    if pd is None:
-        raise ImportError("pandas is not available")
-    if openpyxl is None:
-        raise ImportError("openpyxl is not available")
-    
-    temp_file_path = None
-    try:
-        logger.info("Converting Excel to markdown...")
-        
-        # Save Excel data to temporary file
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temp_file:
-            temp_file.write(excel_data)
-            temp_file_path = temp_file.name
-        
-        # Read Excel file with pandas
-        df = pd.read_excel(temp_file_path, engine='openpyxl')
-        
-        logger.info(f"✅ Excel parsed: {len(df.columns)} columns, {len(df)} rows")
-        
-        # Convert to markdown - handle missing tabulate dependency
-        try:
-            markdown_table = df.to_markdown(index=False)
-        except ImportError:
-            # Fallback: create markdown table manually
-            logger.info("tabulate not available, creating markdown table manually")
-            headers = df.columns.tolist()
-            rows = df.values.tolist()
-            
-            # Create markdown table
-            table_lines = []
-            table_lines.append('| ' + ' | '.join(str(col) for col in headers) + ' |')
-            table_lines.append('|' + '|'.join(['---'] * len(headers)) + '|')
-            
-            for row in rows:
-                # Convert all values to strings and escape pipes
-                row_str = [str(cell).replace('|', '\\|') for cell in row]
-                table_lines.append('| ' + ' | '.join(row_str) + ' |')
-            
-            markdown_table = '\n'.join(table_lines)
-        if markdown_table is None:
-            markdown_table = ""
-        logger.info(f"✅ Excel converted to markdown ({len(markdown_table)} characters)")
-        return markdown_table
-        
-    except Exception as e:
-        logger.error(f"❌ Error converting Excel to markdown: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
-    finally:
-        if temp_file_path:
-            try:
-                os.unlink(temp_file_path)
-                logger.info("✅ Temporary Excel file cleaned up")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to clean up temporary Excel file: {e}")
+# Remove the excel_to_markdown function and any references to it
 
 @app.on_event("startup")
 async def startup_event():
@@ -369,11 +313,25 @@ async def upload(file: UploadFile = File(...)):
         
         elif content_type in ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              "application/vnd.ms-excel"] or file_extension in ["xlsx", "xls"]:
-            # Process Excel
-            logger.info("Processing Excel file...")
-            md = excel_to_markdown(data)
-            pages_processed = 1
-        
+            # Process Excel using MarkItDown
+            logger.info("Processing Excel file with MarkItDown...")
+            try:
+                from markitdown import MarkItDown
+            except ImportError as e:
+                logger.error(f"❌ MarkItDown not installed: {e}")
+                raise HTTPException(500, "MarkItDown is not installed on the server.")
+            try:
+                md_converter = MarkItDown()
+                import io
+                excel_stream = io.BytesIO(data)
+                result = md_converter.convert(excel_stream)
+                md = result.text_content
+                pages_processed = 1  # MarkItDown does not split by sheet, so treat as one doc
+                logger.info(f"✅ Excel converted to markdown using MarkItDown ({len(md)} characters)")
+            except Exception as e:
+                logger.error(f"❌ Error converting Excel with MarkItDown: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise HTTPException(500, f"Failed to convert Excel: {str(e)}")
         else:
             # For other file types, try to extract text and convert
             logger.info("Processing as text file...")
