@@ -137,83 +137,6 @@ def image_to_base64(image) -> str:
         logger.error(f"❌ Error converting image to base64: {e}")
         raise
 
-def docx_to_markdown(docx_data: bytes) -> str:
-    """Convert DOCX data to markdown"""
-    if Document is None:
-        raise ImportError("python-docx is not available")
-    
-    temp_file_path = None
-    try:
-        logger.info("Converting DOCX to markdown...")
-        
-        # Save DOCX data to temporary file
-        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as temp_file:
-            temp_file.write(docx_data)
-            temp_file_path = temp_file.name
-        
-        # Open DOCX document
-        doc = Document(temp_file_path)
-        
-        # Extract text and formatting
-        paragraphs = []
-        for para in doc.paragraphs:
-            if para.text.strip():  # Only add non-empty paragraphs
-                # Check for heading styles
-                if para.style and getattr(para.style, 'name', None) and isinstance(para.style.name, str) and para.style.name.startswith('Heading'):
-                    level = para.style.name[-1] if para.style.name[-1].isdigit() else '1'
-                    paragraphs.append(f"{'#' * int(level)} {para.text}")
-                else:
-                    paragraphs.append(para.text)
-        
-        # Extract table data
-        tables = []
-        for table in doc.tables:
-            table_data = []
-            for row in table.rows:
-                row_data = [cell.text for cell in row.cells]
-                table_data.append(row_data)
-            
-            if table_data:
-                # Convert table to markdown
-                if len(table_data) > 0:
-                    headers = table_data[0]
-                    body = table_data[1:]
-                    
-                    # Create markdown table
-                    table_lines = []
-                    table_lines.append('| ' + ' | '.join(headers) + ' |')
-                    table_lines.append('|' + '|'.join(['---'] * len(headers)) + '|')
-                    
-                    for row in body:
-                        # Pad row if shorter than headers
-                        while len(row) < len(headers):
-                            row.append('')
-                        # Truncate if longer
-                        row = row[:len(headers)]
-                        table_lines.append('| ' + ' | '.join(row) + ' |')
-                    
-                    tables.append('\n'.join(table_lines))
-        
-        # Combine paragraphs and tables
-        content = '\n\n'.join(paragraphs)
-        if tables:
-            content += '\n\n' + '\n\n'.join(tables)
-        
-        logger.info(f"✅ DOCX converted to markdown ({len(content)} characters)")
-        return content
-        
-    except Exception as e:
-        logger.error(f"❌ Error converting DOCX to markdown: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
-    finally:
-        if temp_file_path:
-            try:
-                os.unlink(temp_file_path)
-                logger.info("✅ Temporary DOCX file cleaned up")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to clean up temporary DOCX file: {e}")
-
 def csv_to_markdown(csv_data: bytes) -> str:
     """Convert CSV data to markdown table"""
     try:
@@ -418,10 +341,25 @@ async def upload(file: UploadFile = File(...)):
         
         elif content_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                              "application/msword"] or file_extension in ["docx", "doc"]:
-            # Process Word document
-            logger.info("Processing Word document...")
-            md = docx_to_markdown(data)
-            pages_processed = 1
+            # Process Word document using MarkItDown
+            logger.info("Processing Word document with MarkItDown...")
+            try:
+                from markitdown import MarkItDown
+            except ImportError as e:
+                logger.error(f"❌ MarkItDown not installed: {e}")
+                raise HTTPException(500, "MarkItDown is not installed on the server.")
+            try:
+                md_converter = MarkItDown()
+                import io
+                doc_stream = io.BytesIO(data)
+                result = md_converter.convert(doc_stream)
+                md = result.text_content
+                pages_processed = 1  # MarkItDown does not split by page, so treat as one doc
+                logger.info(f"✅ Word document converted to markdown using MarkItDown ({len(md)} characters)")
+            except Exception as e:
+                logger.error(f"❌ Error converting Word document with MarkItDown: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise HTTPException(500, f"Failed to convert Word document: {str(e)}")
         
         elif content_type == "text/csv" or file_extension == "csv":
             # Process CSV
