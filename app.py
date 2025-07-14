@@ -31,13 +31,6 @@ Document = None
 markdownify = None
 
 try:
-    from PIL import Image
-    logger.info("✅ Pillow imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Failed to import Pillow: {e}")
-    logger.warning("Image processing functionality will be disabled")
-
-try:
     import pandas as pd
     logger.info("✅ pandas imported successfully")
 except ImportError as e:
@@ -121,21 +114,6 @@ app.add_middleware(
 
 # Global variables
 
-
-def image_to_base64(image) -> str:
-    """Convert PIL Image to base64 string"""
-    if Image is None:
-        raise ImportError("Pillow (PIL) is not available")
-    
-    try:
-        buffered = io.BytesIO()
-        image.save(buffered, format="PNG")
-        base64_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        logger.info(f"✅ Image converted to base64 ({len(base64_str)} characters)")
-        return base64_str
-    except Exception as e:
-        logger.error(f"❌ Error converting image to base64: {e}")
-        raise
 
 def csv_to_markdown(csv_data: bytes) -> str:
     """Convert CSV data to markdown table"""

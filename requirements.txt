@@ -1,7 +1,4 @@
 fastapi
 uvicorn[standard]
 python-multipart
-Pillow>=10.0.0
-python-docx>=0.8.11
-markdownify>=0.11.6
 markitdown
