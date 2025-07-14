@@ -24,27 +24,11 @@ logger.info("=" * 50)
 logger.info("Importing required libraries...")
 
 # Global variables for optional dependencies
-fitz = None
-Presentation = None
 Image = None
 pd = None
 openpyxl = None
 Document = None
 markdownify = None
-
-try:
-    import fitz  # PyMuPDF for PDFs
-    logger.info("✅ PyMuPDF imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Failed to import PyMuPDF: {e}")
-    logger.warning("PDF functionality will be disabled")
-
-try:
-    from pptx import Presentation
-    logger.info("✅ python-pptx imported successfully")
-except ImportError as e:
-    logger.warning(f"⚠️ Failed to import python-pptx: {e}")
-    logger.warning("PowerPoint functionality will be disabled")
 
 try:
     from PIL import Image
@@ -152,74 +136,6 @@ def image_to_base64(image) -> str:
     except Exception as e:
         logger.error(f"❌ Error converting image to base64: {e}")
         raise
-
-def pdf_to_images(pdf_data: bytes):
-    """Convert PDF bytes to list of PIL Images"""
-    if fitz is None:
-        raise ImportError("PyMuPDF (fitz) is not available")
-    if Image is None:
-        raise ImportError("Pillow (PIL) is not available")
-    
-    try:
-        logger.info(f"Opening PDF with {len(pdf_data)} bytes...")
-        doc = fitz.open(stream=pdf_data, filetype="pdf")
-        images = []
-        
-        for page_num in range(len(doc)):
-            logger.info(f"Processing page {page_num + 1}/{len(doc)}...")
-            page = doc[page_num]
-            pix = page.get_pixmap()  # type: ignore
-            img_data = pix.pil_tobytes("png")
-            image = Image.open(io.BytesIO(img_data))
-            images.append(image)
-            logger.info(f"✅ Page {page_num + 1} converted to image")
-        
-        doc.close()
-        logger.info(f"✅ PDF converted to {len(images)} images")
-        return images
-    except Exception as e:
-        logger.error(f"❌ Error converting PDF to images: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
-
-def pptx_slide_texts(pptx_data: bytes):
-    """Extract text from PowerPoint bytes"""
-    if Presentation is None:
-        raise ImportError("python-pptx is not available")
-    
-    temp_file_path = None
-    try:
-        logger.info("Creating temporary PPTX file...")
-        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as temp_file:
-            temp_file.write(pptx_data)
-            temp_file_path = temp_file.name
-        
-        logger.info("Opening PowerPoint presentation...")
-        prs = Presentation(temp_file_path)
-        slides_text = []
-        
-        for slide_num, slide in enumerate(prs.slides):
-            logger.info(f"Processing slide {slide_num + 1}/{len(prs.slides)}...")
-            text = []
-            for shape in slide.shapes:
-                if hasattr(shape, "text"):
-                    text.append(shape.text)  # type: ignore
-            slides_text.append("\n".join(text))
-            logger.info(f"✅ Slide {slide_num + 1} text extracted")
-        
-        logger.info(f"✅ PowerPoint converted to {len(slides_text)} slides")
-        return slides_text
-    except Exception as e:
-        logger.error(f"❌ Error extracting PowerPoint text: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
-    finally:
-        if temp_file_path:
-            try:
-                os.unlink(temp_file_path)
-                logger.info("✅ Temporary PPTX file cleaned up")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to clean up temporary PPTX file: {e}")
 
 def docx_to_markdown(docx_data: bytes) -> str:
     """Convert DOCX data to markdown"""

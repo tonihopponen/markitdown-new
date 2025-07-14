@@ -42,8 +42,6 @@ def main():
     
     # Document processing
     print("\n--- Document Processing ---")
-    test_import("fitz", "PyMuPDF")  # PDF processing
-    test_import("pptx", "python-pptx")  # PowerPoint processing
     test_import("docx", "python-docx")  # Word document processing
     test_import("PIL", "Pillow")  # Image processing
     

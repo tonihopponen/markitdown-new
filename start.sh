@@ -19,4 +19,13 @@ fi
 echo ""
 echo "✅ All tests passed, starting server..."
 # Start the FastAPI server
-exec uvicorn app:app --host 0.0.0.0 --port $PORT 
+# Set default port if not provided
+PORT=${PORT:-8000}
+
+# Start the FastAPI app with uvicorn
+uvicorn app:app --host 0.0.0.0 --port $PORT --reload
+
+echo "\nApp running!"
+echo "- Main page:     http://127.0.0.1:$PORT/"
+echo "- Upload API:    http://127.0.0.1:$PORT/upload (POST)"
+echo "- Health check:  http://127.0.0.1:$PORT/health" 

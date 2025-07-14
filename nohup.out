@@ -1,0 +1,172 @@
+Starting PDF to Markdown converter...
+Environment check:
+- R2_ENDPOINT_URL: 
+- R2_BUCKET_NAME: 
+- R2_ACCOUNT_ID: 
+- R2_ACCESS_KEY_ID: 
+- R2_SECRET_ACCESS_KEY: 
+
+Testing imports...
+==================================================
+Testing all required dependencies...
+==================================================
+
+--- Core Dependencies ---
+✅ fastapi imported successfully
+✅ uvicorn imported successfully
+❌ Failed to import multipart: No module named 'python-multipart'
+   Traceback: Traceback (most recent call last):
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/test_imports.py", line 14, in test_import
+    module = __import__(package_name)
+ModuleNotFoundError: No module named 'python-multipart'
+
+
+--- AI/ML Dependencies ---
+✅ openai imported successfully
+
+--- Document Processing ---
+❌ Failed to import fitz: No module named 'PyMuPDF'
+   Traceback: Traceback (most recent call last):
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/test_imports.py", line 14, in test_import
+    module = __import__(package_name)
+ModuleNotFoundError: No module named 'PyMuPDF'
+
+❌ Failed to import pptx: No module named 'python-pptx'
+   Traceback: Traceback (most recent call last):
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/test_imports.py", line 14, in test_import
+    module = __import__(package_name)
+ModuleNotFoundError: No module named 'python-pptx'
+
+❌ Failed to import docx: No module named 'python-docx'
+   Traceback: Traceback (most recent call last):
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/test_imports.py", line 14, in test_import
+    module = __import__(package_name)
+ModuleNotFoundError: No module named 'python-docx'
+
+❌ Failed to import PIL: No module named 'Pillow'
+   Traceback: Traceback (most recent call last):
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/test_imports.py", line 14, in test_import
+    module = __import__(package_name)
+ModuleNotFoundError: No module named 'Pillow'
+
+
+--- Data Processing ---
+✅ pandas imported successfully
+✅ openpyxl imported successfully
+✅ markdownify imported successfully
+✅ tabulate imported successfully
+
+==================================================
+Import testing complete!
+==================================================
+
+✅ All tests passed, starting server...
+INFO:     Will watch for changes in these directories: ['/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [66577] using WatchFiles
+2025-07-14 09:12:05,638 - app - INFO - ==================================================
+2025-07-14 09:12:05,638 - app - INFO - Starting Document to Markdown converter application...
+2025-07-14 09:12:05,638 - app - INFO - ==================================================
+2025-07-14 09:12:05,638 - app - INFO - Importing required libraries...
+2025-07-14 09:12:05,734 - app - INFO - ✅ PyMuPDF imported successfully
+2025-07-14 09:12:05,809 - app - INFO - ✅ python-pptx imported successfully
+2025-07-14 09:12:05,809 - app - INFO - ✅ Pillow imported successfully
+2025-07-14 09:12:06,011 - app - INFO - ✅ pandas imported successfully
+2025-07-14 09:12:06,049 - app - INFO - ✅ openpyxl imported successfully
+2025-07-14 09:12:06,077 - app - INFO - ✅ python-docx imported successfully
+2025-07-14 09:12:06,120 - app - INFO - ✅ markdownify imported successfully
+2025-07-14 09:12:06,120 - app - INFO - Library import check completed!
+INFO:     Started server process [66579]
+INFO:     Waiting for application startup.
+2025-07-14 09:12:06,121 - app - INFO - ==================================================
+2025-07-14 09:12:06,121 - app - INFO - Application starting up...
+2025-07-14 09:12:06,121 - app - INFO - ==================================================
+INFO:     Application startup complete.
+2025-07-14 09:12:14,259 - app - INFO - Serving index page
+2025-07-14 09:12:14,259 - app - INFO - ✅ Index page loaded successfully (5171 characters)
+INFO:     127.0.0.1:62268 - "GET / HTTP/1.1" 200 OK
+2025-07-14 09:12:42,961 - app - INFO - ==================================================
+2025-07-14 09:12:42,963 - app - INFO - Upload request received for file: Dickinson_Sample_Slides.pptx
+2025-07-14 09:12:42,963 - app - INFO - ==================================================
+2025-07-14 09:12:42,963 - app - INFO - Reading file data...
+2025-07-14 09:12:42,963 - app - INFO - ✅ File read successfully (647237 bytes)
+2025-07-14 09:12:42,963 - app - INFO - File type: application/vnd.openxmlformats-officedocument.presentationml.presentation, extension: pptx
+2025-07-14 09:12:42,963 - app - INFO - Processing PowerPoint file with MarkItDown...
+2025-07-14 09:12:43,220 - app - INFO - ✅ PowerPoint converted to markdown using MarkItDown (2354 characters)
+2025-07-14 09:12:43,220 - app - INFO - ✅ Conversion successful, markdown length: 2354 characters
+2025-07-14 09:12:43,220 - app - INFO - ✅ Returning successful response
+INFO:     127.0.0.1:62296 - "POST /upload HTTP/1.1" 200 OK
+2025-07-14 09:13:20,022 - app - INFO - ==================================================
+2025-07-14 09:13:20,024 - app - INFO - Upload request received for file: Invoice-D736FB4A-0002.pdf
+2025-07-14 09:13:20,024 - app - INFO - ==================================================
+2025-07-14 09:13:20,024 - app - INFO - Reading file data...
+2025-07-14 09:13:20,024 - app - INFO - ✅ File read successfully (31872 bytes)
+2025-07-14 09:13:20,024 - app - INFO - File type: application/pdf, extension: pdf
+2025-07-14 09:13:20,024 - app - INFO - Processing PDF file with MarkItDown...
+2025-07-14 09:13:20,096 - app - ERROR - ❌ Error converting PDF with MarkItDown: File conversion failed after 1 attempts:
+ - PdfConverter threw MissingDependencyException with message: PdfConverter recognized the input as a potential .pdf file, but the dependencies needed to read .pdf files have not been installed. To resolve this error, include the optional dependency [pdf] or [all] when installing MarkItDown. For example:
+
+* pip install markitdown[pdf]
+* pip install markitdown[all]
+* pip install markitdown[pdf, ...]
+* etc.
+
+2025-07-14 09:13:20,101 - app - ERROR - Traceback: Traceback (most recent call last):
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/app.py", line 431, in upload
+    result = md_converter.convert(pdf_stream)
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/venv/lib/python3.13/site-packages/markitdown/_markitdown.py", line 287, in convert
+    return self.convert_stream(source, stream_info=stream_info, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/venv/lib/python3.13/site-packages/markitdown/_markitdown.py", line 375, in convert_stream
+    return self._convert(file_stream=stream, stream_info_guesses=guesses, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/tonihopponen/landingrabbit/pdf-to-markdown/pdf-to-markdown/venv/lib/python3.13/site-packages/markitdown/_markitdown.py", line 614, in _convert
+    raise FileConversionException(attempts=failed_attempts)
+markitdown._exceptions.FileConversionException: File conversion failed after 1 attempts:
+ - PdfConverter threw MissingDependencyException with message: PdfConverter recognized the input as a potential .pdf file, but the dependencies needed to read .pdf files have not been installed. To resolve this error, include the optional dependency [pdf] or [all] when installing MarkItDown. For example:
+
+* pip install markitdown[pdf]
+* pip install markitdown[all]
+* pip install markitdown[pdf, ...]
+* etc.
+
+
+2025-07-14 09:13:20,101 - app - INFO - Re-raising HTTP exception
+INFO:     127.0.0.1:62306 - "POST /upload HTTP/1.1" 500 Internal Server Error
+WARNING:  WatchFiles detected changes in 'app.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [66579]
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f9079f00 (most recent call first):
+  <no Python frame>
+WARNING:  WatchFiles detected changes in 'app.py'. Reloading...
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f9079f00 (most recent call first):
+  <no Python frame>
+WARNING:  WatchFiles detected changes in 'venv/lib/python3.13/site-packages/cryptography/hazmat/backends/openssl/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/rsa.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/ciphers/__init__.py', 'venv/lib/python3.13/site-packages/cffi/_imp_emulation.py', 'venv/lib/python3.13/site-packages/pycparser/ply/yacc.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/twofactor/totp.py', 'venv/lib/python3.13/site-packages/cryptography/x509/oid.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/keywrap.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/decrepit/ciphers/__init__.py', 'venv/lib/python3.13/site-packages/pycparser/ply/ctokens.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/ciphers/modes.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/scrypt.py', 'venv/lib/python3.13/site-packages/pycparser/ast_transforms.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/twofactor/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/bindings/__init__.py', 'venv/lib/python3.13/site-packages/cffi/vengine_gen.py', 'venv/lib/python3.13/site-packages/cryptography/x509/name.py', 'venv/lib/python3.13/site-packages/cryptography/utils.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/x25519.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/bindings/openssl/_conditional.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/argon2.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/pbkdf2.py', 'venv/lib/python3.13/site-packages/cryptography/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/ec.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/backends/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/_asymmetric.py', 'venv/lib/python3.13/site-packages/cryptography/__about__.py', 'venv/lib/python3.13/site-packages/pycparser/c_ast.py', 'venv/lib/python3.13/site-packages/pycparser/c_generator.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/serialization/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/x963kdf.py', 'venv/lib/python3.13/site-packages/cryptography/x509/ocsp.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/ed448.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/twofactor/hotp.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/serialization/base.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/bindings/openssl/binding.py', 'venv/lib/python3.13/site-packages/cffi/pkgconfig.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/serialization/pkcs12.py', 'venv/lib/python3.13/site-packages/cffi/setuptools_ext.py', 'venv/lib/python3.13/site-packages/cffi/api.py', 'venv/lib/python3.13/site-packages/cffi/backend_ctypes.py', 'venv/lib/python3.13/site-packages/pycparser/__init__.py', 'venv/lib/python3.13/site-packages/pycparser/c_parser.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/ed25519.py', 'venv/lib/python3.13/site-packages/cryptography/x509/general_name.py', 'venv/lib/python3.13/site-packages/cryptography/fernet.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/kbkdf.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/dsa.py', 'venv/lib/python3.13/site-packages/pycparser/ply/lex.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/dh.py', 'venv/lib/python3.13/site-packages/pycparser/yacctab.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/bindings/openssl/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/hashes.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/types.py', 'venv/lib/python3.13/site-packages/cffi/cffi_opcode.py', 'venv/lib/python3.13/site-packages/cffi/recompiler.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/x448.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/_cipheralgorithm.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/serialization/pkcs7.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/decrepit/ciphers/algorithms.py', 'venv/lib/python3.13/site-packages/cryptography/x509/certificate_transparency.py', 'venv/lib/python3.13/site-packages/cryptography/x509/__init__.py', 'venv/lib/python3.13/site-packages/cffi/cparser.py', 'venv/lib/python3.13/site-packages/pycparser/c_lexer.py', 'venv/lib/python3.13/site-packages/cffi/verifier.py', 'venv/lib/python3.13/site-packages/pycparser/lextab.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/_serialization.py', 'venv/lib/python3.13/site-packages/cffi/ffiplatform.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/constant_time.py', 'venv/lib/python3.13/site-packages/cffi/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/x509/verification.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/padding.py', 'venv/lib/python3.13/site-packages/cffi/vengine_cpy.py', 'venv/lib/python3.13/site-packages/cryptography/exceptions.py', 'venv/lib/python3.13/site-packages/cryptography/x509/extensions.py', 'venv/lib/python3.13/site-packages/pycparser/_ast_gen.py', 'venv/lib/python3.13/site-packages/cryptography/x509/base.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/backends/openssl/backend.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/poly1305.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/serialization/ssh.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/__init__.py', 'venv/lib/python3.13/site-packages/pycparser/ply/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/padding.py', 'venv/lib/python3.13/site-packages/cffi/commontypes.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/ciphers/aead.py', 'venv/lib/python3.13/site-packages/cffi/_shimmed_dist_utils.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/hkdf.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/ciphers/base.py', 'venv/lib/python3.13/site-packages/pycparser/ply/ygen.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/decrepit/__init__.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/concatkdf.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/_oid.py', 'venv/lib/python3.13/site-packages/pycparser/_build_tables.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/asymmetric/utils.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/cmac.py', 'venv/lib/python3.13/site-packages/pycparser/ply/cpp.py', 'venv/lib/python3.13/site-packages/pycparser/plyparser.py', 'venv/lib/python3.13/site-packages/cffi/model.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/ciphers/algorithms.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/hmac.py', 'venv/lib/python3.13/site-packages/cffi/error.py', 'venv/lib/python3.13/site-packages/cffi/lock.py', 'venv/lib/python3.13/site-packages/cryptography/hazmat/primitives/kdf/__init__.py'. Reloading...
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f9079f00 (most recent call first):
+  <no Python frame>
+WARNING:  WatchFiles detected changes in 'venv/lib/python3.13/site-packages/pdfminer/pdftypes.py', 'venv/lib/python3.13/site-packages/pdfminer/ccitt.py', 'venv/lib/python3.13/site-packages/pdfminer/psparser.py', 'venv/bin/dumppdf.py', 'venv/lib/python3.13/site-packages/pdfminer/casting.py', 'venv/lib/python3.13/site-packages/pdfminer/pdfdevice.py', 'venv/lib/python3.13/site-packages/pdfminer/jbig2.py', 'venv/lib/python3.13/site-packages/pdfminer/psexceptions.py', 'venv/lib/python3.13/site-packages/pdfminer/runlength.py', 'venv/lib/python3.13/site-packages/pdfminer/fontmetrics.py', 'venv/lib/python3.13/site-packages/pdfminer/data_structures.py', 'venv/lib/python3.13/site-packages/pdfminer/__init__.py', 'venv/lib/python3.13/site-packages/pdfminer/pdffont.py', 'venv/lib/python3.13/site-packages/pdfminer/converter.py', 'venv/lib/python3.13/site-packages/pdfminer/settings.py', 'venv/lib/python3.13/site-packages/pdfminer/pdfexceptions.py', 'venv/lib/python3.13/site-packages/pdfminer/glyphlist.py', 'venv/lib/python3.13/site-packages/pdfminer/pdfcolor.py', 'venv/lib/python3.13/site-packages/pdfminer/arcfour.py', 'venv/bin/pdf2txt.py', 'venv/lib/python3.13/site-packages/pdfminer/utils.py', 'venv/lib/python3.13/site-packages/pdfminer/layout.py', 'venv/lib/python3.13/site-packages/pdfminer/pdfinterp.py', 'venv/lib/python3.13/site-packages/pdfminer/encodingdb.py', 'venv/lib/python3.13/site-packages/pdfminer/pdfparser.py', 'venv/lib/python3.13/site-packages/pdfminer/cmapdb.py', 'venv/lib/python3.13/site-packages/pdfminer/pdfdocument.py', 'venv/lib/python3.13/site-packages/pdfminer/image.py', 'venv/lib/python3.13/site-packages/pdfminer/high_level.py', 'venv/lib/python3.13/site-packages/pdfminer/latin_enc.py', 'venv/lib/python3.13/site-packages/pdfminer/_saslprep.py', 'venv/lib/python3.13/site-packages/pdfminer/pdfpage.py', 'venv/lib/python3.13/site-packages/pdfminer/ascii85.py', 'venv/lib/python3.13/site-packages/pdfminer/lzw.py'. Reloading...
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f9079f00 (most recent call first):
+  <no Python frame>
+./start.sh: line 26: 66577 Killed: 9               uvicorn app:app --host 0.0.0.0 --port $PORT --reload
+\nApp running!
+- Main page:     http://127.0.0.1:8000/
+- Upload API:    http://127.0.0.1:8000/upload (POST)
+- Health check:  http://127.0.0.1:8000/health
